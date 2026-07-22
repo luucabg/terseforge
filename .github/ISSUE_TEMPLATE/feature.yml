@@ -1,0 +1,35 @@
+name: Feature proposal
+description: Propose a measurable, local-first improvement
+title: "feat: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What measurable workflow problem is not solved today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: measurement
+    attributes:
+      label: Verification and measurement
+      description: How will we know this saves total cost without lowering success or code quality?
+    validations:
+      required: true
+  - type: dropdown
+    id: privacy
+    attributes:
+      label: Does this preserve local-only operation?
+      options:
+        - Yes
+        - No
+        - Unsure
+    validations:
+      required: true
