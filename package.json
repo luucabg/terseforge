@@ -1,7 +1,7 @@
 {
   "name": "terseforge",
   "version": "0.1.0",
-  "description": "Local, measurable context optimization for AI coding agents without sacrificing verification or code quality.",
+  "description": "Local CLI for reducing context and tool-output noise in AI coding-agent workflows without sacrificing verification or code quality.",
   "type": "module",
   "bin": {
     "terseforge": "dist/cli.js"
@@ -24,6 +24,7 @@
     "CHANGELOG.md",
     "CONTRIBUTING.md",
     "SECURITY.md",
+    "llms.txt",
     "terseforge.config.example.json",
     "LICENSE"
   ],
@@ -41,10 +42,21 @@
   },
   "keywords": [
     "ai",
+    "ai-agents",
+    "ai-coding-agents",
+    "agent-skills",
+    "claude-code",
+    "codex-cli",
     "coding-agents",
     "cli",
-    "context",
-    "token-optimization"
+    "context-engineering",
+    "developer-tools",
+    "gemini-cli",
+    "local-first",
+    "privacy",
+    "token-efficiency",
+    "token-optimization",
+    "tool-output"
   ],
   "license": "MIT",
   "repository": {

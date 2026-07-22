@@ -6,6 +6,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Changed
+
+- Redesigned the repository landing page around a clearer quick start, workflow, compatibility contract, reproducible evidence, and safety guarantees.
+- Expanded package metadata for more accurate discovery across AI coding-agent and developer-tool searches.
+- Optimized the hero artwork from 1.76 MB to approximately 125 KB while preserving its 2:1 presentation.
+
+### Added
+
+- Machine-readable `llms.txt` summary with capabilities, compatibility levels, safety guarantees, benchmark scope, and explicit non-claims.
+- Brand and messaging guidelines for consistent visuals, terminology, and evidence-based claims.
+
 ## [0.1.0] - 2026-07-22
 
 ### Added
