@@ -1,0 +1,83 @@
+# TerseForge
+
+> Local, measurable context and tool-output optimization for AI coding agents without sacrificing verification or code quality.
+
+Canonical repository: https://github.com/luucabg/terseforge
+License: MIT
+Runtime: Node.js 22 or newer
+Language: TypeScript
+Package name: terseforge
+Publication status: not published to npm as of v0.1.0
+
+## What TerseForge is
+
+TerseForge is a local CLI and instruction toolkit for AI coding-agent workflows. It reduces noisy visible command output, selects TypeScript and JavaScript repository context progressively, stores complete raw output for exact recovery, runs configured quality gates, and records local metrics.
+
+TerseForge can be useful beside Claude Code, Codex, Gemini CLI, agents that load AGENTS.md, Cursor, Windsurf, and Cline. Compatibility levels differ by agent and are documented explicitly.
+
+## What TerseForge is not
+
+- It is not an AI coding agent or LLM proxy.
+- It does not reduce a model's private reasoning effort.
+- It does not generate, rewrite, or validate code by itself.
+- It does not guarantee lower end-to-end token usage or cost.
+- It does not transparently intercept every tool call from every agent.
+- It does not use a server, call a model, upload repository content, or send remote telemetry.
+- It is not published to npm yet.
+
+## Core capabilities
+
+- Recoverable tool-output pruning with protected diagnostics.
+- Exact raw-output retrieval by run identifier and optional line range.
+- TypeScript and JavaScript repository maps based on paths, imports, and top-level symbols.
+- Ranked, line-numbered context snippets within a configurable estimated-token budget.
+- Configurable typecheck, lint, test, and build quality gates.
+- Safe, lean, and ultra visible-output presets; safe is the default.
+- Local JSONL metrics and deterministic session handoffs.
+- Reproducible component benchmark with committed baseline data.
+
+## Commands
+
+- terseforge init
+- terseforge doctor
+- terseforge exec
+- terseforge output
+- terseforge map
+- terseforge context
+- terseforge check
+- terseforge handoff
+- terseforge stats
+- terseforge bench
+
+## Compatibility terms
+
+- Native-limited: the agent natively loads an included instruction or skill format and may invoke the CLI, but TerseForge does not transparently intercept all tools.
+- Instructions-only: a persistent rule file describes how to use the CLI; runtime enforcement is unavailable.
+- Experimental: an integration asset exists, but its hook behavior and version compatibility are not release-tested.
+
+Claude Code and Codex are native-limited in v0.1. Gemini CLI is experimental. Generic AGENTS.md agents, Cursor, Windsurf, and Cline are instructions-only.
+
+## Safety contract
+
+- Errors, warnings, paths, line numbers, commands, diffs, and security findings are protected content.
+- Complete command output is stored locally and remains recoverable.
+- Required quality-gate failures return a non-zero exit code.
+- Commands use executable-and-argument arrays rather than concatenated user-controlled shell expressions.
+- Existing agent instruction files are not overwritten by initialization.
+
+## Benchmark evidence
+
+The v0.1 component benchmark uses a fixed 504-line synthetic TypeScript test log. The committed baseline reports visible-byte reductions of 75.78% for safe, 88.99% for lean, and 94.64% for ultra while retaining known diagnostics and exact raw recovery.
+
+These component results are not evidence of equivalent total-token savings, cost savings, task success, or code quality. End-to-end claims require controlled A/B agent runs.
+
+## Primary documentation
+
+- README: https://github.com/luucabg/terseforge/blob/main/README.md
+- Architecture: https://github.com/luucabg/terseforge/blob/main/docs/architecture.md
+- Configuration: https://github.com/luucabg/terseforge/blob/main/docs/configuration.md
+- Compatibility: https://github.com/luucabg/terseforge/blob/main/docs/compatibility.md
+- Benchmarking: https://github.com/luucabg/terseforge/blob/main/docs/benchmarking.md
+- Privacy: https://github.com/luucabg/terseforge/blob/main/docs/privacy.md
+- Security: https://github.com/luucabg/terseforge/blob/main/SECURITY.md
+- Baseline data: https://github.com/luucabg/terseforge/blob/main/benchmarks/baseline-v0.1.json
