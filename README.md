@@ -2,6 +2,8 @@
 
 **Big code. Small chatter.**
 
+![TerseForge compresses noisy code and terminal output into a clean, structured signal.](assets/brand/terseforge-hero.png)
+
 TerseForge is a local, measurable optimization layer for AI coding-agent workflows. It reduces irrelevant context, noisy command output, and repetitive visible narration while preserving exact raw logs and enforcing configured quality gates.
 
 > [!IMPORTANT]
