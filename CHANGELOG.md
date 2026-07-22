@@ -8,12 +8,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Changed
 
+- Classified Gemini CLI as native-limited for Agent Skill discovery while continuing to make no hook-interception claim.
 - Redesigned the repository landing page around a clearer quick start, workflow, compatibility contract, reproducible evidence, and safety guarantees.
 - Expanded package metadata for more accurate discovery across AI coding-agent and developer-tool searches.
 - Optimized the hero artwork from 1.76 MB to approximately 125 KB while preserving its 2:1 presentation.
 
 ### Added
 
+- Portable TerseForge Agent Skill with natural-language activation for Codex, Claude Code, and Gemini CLI.
+- Safe, idempotent `skill install` and `skill status` commands for user and project discovery paths.
+- `mode` command for changing presets without resetting other project configuration.
 - Machine-readable `llms.txt` summary with capabilities, compatibility levels, safety guarantees, benchmark scope, and explicit non-claims.
 - Brand and messaging guidelines for consistent visuals, terminology, and evidence-based claims.
 

@@ -1,6 +1,18 @@
 # Example workflow
 
-From a repository initialized with TerseForge:
+Install the skill once for your agent:
+
+```bash
+terseforge skill install --agent codex
+```
+
+Then open a repository in a new agent session and say:
+
+```text
+Activa TerseForge en este proyecto.
+```
+
+The equivalent explicit workflow is:
 
 ```bash
 terseforge doctor

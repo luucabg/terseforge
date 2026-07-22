@@ -35,10 +35,14 @@ TerseForge can be useful beside Claude Code, Codex, Gemini CLI, agents that load
 - Safe, lean, and ultra visible-output presets; safe is the default.
 - Local JSONL metrics and deterministic session handoffs.
 - Reproducible component benchmark with committed baseline data.
+- Portable Agent Skill for natural-language activation in Codex, Claude Code, and Gemini CLI.
 
 ## Commands
 
 - terseforge init
+- terseforge mode
+- terseforge skill install
+- terseforge skill status
 - terseforge doctor
 - terseforge exec
 - terseforge output
@@ -55,7 +59,7 @@ TerseForge can be useful beside Claude Code, Codex, Gemini CLI, agents that load
 - Instructions-only: a persistent rule file describes how to use the CLI; runtime enforcement is unavailable.
 - Experimental: an integration asset exists, but its hook behavior and version compatibility are not release-tested.
 
-Claude Code and Codex are native-limited in v0.1. Gemini CLI is experimental. Generic AGENTS.md agents, Cursor, Windsurf, and Cline are instructions-only.
+Claude Code, Codex, and Gemini CLI are native-limited in v0.1 through native Agent Skill discovery plus explicit CLI use. This does not imply transparent tool interception. Generic AGENTS.md agents, Cursor, Windsurf, and Cline are instructions-only.
 
 ## Safety contract
 
@@ -77,6 +81,7 @@ These component results are not evidence of equivalent total-token savings, cost
 - Architecture: https://github.com/luucabg/terseforge/blob/main/docs/architecture.md
 - Configuration: https://github.com/luucabg/terseforge/blob/main/docs/configuration.md
 - Compatibility: https://github.com/luucabg/terseforge/blob/main/docs/compatibility.md
+- Natural-language activation: https://github.com/luucabg/terseforge/blob/main/docs/skills.md
 - Benchmarking: https://github.com/luucabg/terseforge/blob/main/docs/benchmarking.md
 - Privacy: https://github.com/luucabg/terseforge/blob/main/docs/privacy.md
 - Security: https://github.com/luucabg/terseforge/blob/main/SECURITY.md

@@ -1,5 +1,5 @@
 export { createBenchmarkFixture, runBenchmark } from "./benchmark.js";
-export { CONFIG_FILE, PRESETS, configSchema, createDefaultConfig, loadConfig, writeConfig } from "./config.js";
+export { CONFIG_FILE, PRESETS, configSchema, createDefaultConfig, loadConfig, setPreset, writeConfig } from "./config.js";
 export type { Preset, TerseForgeConfig } from "./config.js";
 export { buildRepositoryMap, formatRepositoryMap, selectContext } from "./context.js";
 export { runQualityGates } from "./gates.js";
@@ -8,4 +8,6 @@ export { diagnoseProject, initializeProject } from "./project.js";
 export { pruneText, StreamingPruner } from "./pruning.js";
 export { runProcess } from "./runner.js";
 export { readArtifact, readMetrics } from "./storage.js";
+export { installSkill, inspectSkill, resolveSkillDestination, SKILL_AGENTS, SKILL_SCOPES } from "./skill.js";
+export type { SkillAgent, SkillInspection, SkillInstallOptions, SkillInstallResult, SkillLocationOptions, SkillScope } from "./skill.js";
 export { createHandoff, summarizeMetrics } from "./workflows.js";

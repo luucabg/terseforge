@@ -96,3 +96,11 @@ export async function loadConfig(root: string): Promise<TerseForgeConfig> {
     throw error;
   }
 }
+
+export async function setPreset(root: string, preset: Preset): Promise<TerseForgeConfig> {
+  if (!(PRESETS as readonly string[]).includes(preset)) throw new Error(`Unknown preset: ${preset}`);
+  const config = await loadConfig(root);
+  const changed = { ...config, preset };
+  await writeConfig(root, changed);
+  return changed;
+}

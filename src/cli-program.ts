@@ -1,12 +1,13 @@
 import { resolve } from "node:path";
-import { Command, Option } from "commander";
+import { Argument, Command, Option } from "commander";
 import { runBenchmark } from "./benchmark.js";
-import { loadConfig, PRESETS } from "./config.js";
+import { loadConfig, PRESETS, setPreset, type Preset } from "./config.js";
 import { buildRepositoryMap, formatRepositoryMap, selectContext } from "./context.js";
 import { runQualityGates, type GateResult } from "./gates.js";
 import { selectArtifactLines } from "./output.js";
 import { diagnoseProject, initializeProject } from "./project.js";
 import { runProcess } from "./runner.js";
+import { installSkill, inspectSkill, SKILL_AGENTS, SKILL_SCOPES, type SkillAgent, type SkillScope } from "./skill.js";
 import { readArtifact, readMetrics } from "./storage.js";
 import { createHandoff, summarizeMetrics } from "./workflows.js";
 
@@ -46,6 +47,47 @@ export function createCli(io: CliIo = defaultIo): Command {
       const result = await initializeProject(root(), options);
       io.stdout(line(`Created: ${result.created.join(", ") || "nothing"}`));
       if (result.skipped.length > 0) io.stdout(line(`Preserved existing: ${result.skipped.join(", ")}`));
+    });
+
+  program
+    .command("mode")
+    .description("change the project preset without resetting other configuration")
+    .addArgument(new Argument("<preset>", "safe, lean, or ultra").choices([...PRESETS]))
+    .action(async (preset: Preset) => {
+      const config = await setPreset(root(), preset);
+      io.stdout(line(`Preset: ${config.preset}`));
+    });
+
+  const skill = program.command("skill").description("install or inspect the natural-language Agent Skill");
+  skill
+    .command("install")
+    .description("install the TerseForge skill for one agent")
+    .addOption(new Option("--agent <agent>", "target agent").choices([...SKILL_AGENTS]).makeOptionMandatory())
+    .addOption(new Option("--scope <scope>", "user or project installation").choices([...SKILL_SCOPES]).default("user"))
+    .option("--force", "update an existing TerseForge skill; never replace a foreign skill", false)
+    .action(async (options: { agent: SkillAgent; scope: SkillScope; force: boolean }) => {
+      const result = await installSkill(root(), {
+        ...options,
+        ...(process.env.CODEX_HOME ? { codexRoot: process.env.CODEX_HOME } : {})
+      });
+      io.stdout(line(`Skill ${result.status}: ${result.destination}`));
+      io.stdout(line(result.reloadHint));
+    });
+  skill
+    .command("status")
+    .description("inspect native skill discovery locations")
+    .addOption(new Option("--agent <agent>", "target agent; omit to inspect all").choices([...SKILL_AGENTS]))
+    .addOption(new Option("--scope <scope>", "user or project installation").choices([...SKILL_SCOPES]).default("user"))
+    .action(async (options: { agent?: SkillAgent; scope: SkillScope }) => {
+      const agents = options.agent ? [options.agent] : [...SKILL_AGENTS];
+      for (const agent of agents) {
+        const result = await inspectSkill(root(), {
+          agent,
+          scope: options.scope,
+          ...(process.env.CODEX_HOME ? { codexRoot: process.env.CODEX_HOME } : {})
+        });
+        io.stdout(line(`${agent} ${options.scope}: ${result.status} (${result.destination})`));
+      }
     });
 
   program

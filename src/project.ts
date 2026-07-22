@@ -125,20 +125,20 @@ export async function diagnoseProject(root: string): Promise<DoctorReport> {
     {
       name: "Claude Code",
       level: "native-limited",
-      installed: await exists(join(root, "CLAUDE.md")),
-      detail: "instruction/skill asset plus explicit CLI; automatic interception is not claimed"
+      installed: (await exists(join(root, "CLAUDE.md"))) || (await exists(join(root, ".claude", "skills", "terseforge", "SKILL.md"))),
+      detail: "native project skill or instruction asset plus explicit CLI; automatic interception is not claimed"
     },
     {
       name: "Codex",
       level: "native-limited",
-      installed: await exists(join(root, "AGENTS.md")),
-      detail: "AGENTS.md/skill asset plus explicit CLI; automatic interception is not claimed"
+      installed: (await exists(join(root, "AGENTS.md"))) || (await exists(join(root, ".agents", "skills", "terseforge", "SKILL.md"))),
+      detail: "native project skill or AGENTS.md plus explicit CLI; automatic interception is not claimed"
     },
     {
       name: "Gemini CLI",
-      level: "experimental",
-      installed: await exists(join(root, "GEMINI.md")),
-      detail: "experimental instruction asset; no hook interception"
+      level: "native-limited",
+      installed: (await exists(join(root, "GEMINI.md"))) || (await exists(join(root, ".gemini", "skills", "terseforge", "SKILL.md"))),
+      detail: "native project skill or GEMINI.md plus explicit CLI; automatic interception is not claimed"
     },
     {
       name: "Cursor / Windsurf / Cline",
