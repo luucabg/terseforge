@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "scope": "tool-output-pruning-only",
+  "fixture": "synthetic-typescript-test-log-v1",
+  "conditions": [
+    {
+      "preset": "safe",
+      "rawBytes": 10865,
+      "visibleBytes": 2631,
+      "reductionPercent": 75.78,
+      "diagnosticsRetained": true,
+      "rawRecoverable": true
+    },
+    {
+      "preset": "lean",
+      "rawBytes": 10865,
+      "visibleBytes": 1196,
+      "reductionPercent": 88.99,
+      "diagnosticsRetained": true,
+      "rawRecoverable": true
+    },
+    {
+      "preset": "ultra",
+      "rawBytes": 10865,
+      "visibleBytes": 582,
+      "reductionPercent": 94.64,
+      "diagnosticsRetained": true,
+      "rawRecoverable": true
+    }
+  ],
+  "note": "Component baseline only. It does not measure end-to-end agent tokens, cost, task success, or code quality."
+}

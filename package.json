@@ -1,0 +1,78 @@
+{
+  "name": "terseforge",
+  "version": "0.1.0",
+  "description": "Local, measurable context optimization for AI coding agents without sacrificing verification or code quality.",
+  "type": "module",
+  "bin": {
+    "terseforge": "dist/cli.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "assets",
+    "benchmarks",
+    "docs",
+    "examples",
+    "README.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "terseforge.config.example.json",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "check": "npm run typecheck && npm run lint && npm run test:coverage && npm run build",
+    "prepack": "npm run check"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "keywords": [
+    "ai",
+    "coding-agents",
+    "cli",
+    "context",
+    "token-optimization"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/luucabg/terseforge.git"
+  },
+  "bugs": {
+    "url": "https://github.com/luucabg/terseforge/issues"
+  },
+  "homepage": "https://github.com/luucabg/terseforge#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "commander": "^14.0.3",
+    "cross-spawn": "^7.0.6",
+    "fast-glob": "^3.3.3",
+    "ignore": "^7.0.6",
+    "typescript": "^5.9.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/cross-spawn": "^6.0.6",
+    "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "^4.1.10",
+    "eslint": "^10.7.0",
+    "typescript-eslint": "^8.65.0",
+    "vitest": "^4.1.10"
+  }
+}

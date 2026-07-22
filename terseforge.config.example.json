@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "preset": "safe",
+  "telemetry": false,
+  "context": {
+    "budgetTokens": 1200,
+    "maxFileBytes": 200000
+  },
+  "output": {
+    "artifactRetentionDays": 30
+  },
+  "qualityGates": [
+    {
+      "name": "typecheck",
+      "command": "npm",
+      "args": ["run", "typecheck", "--if-present"],
+      "required": true,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "lint",
+      "command": "npm",
+      "args": ["run", "lint", "--if-present"],
+      "required": true,
+      "timeoutMs": 120000
+    },
+    {
+      "name": "test",
+      "command": "npm",
+      "args": ["test", "--if-present"],
+      "required": true,
+      "timeoutMs": 300000
+    },
+    {
+      "name": "build",
+      "command": "npm",
+      "args": ["run", "build", "--if-present"],
+      "required": true,
+      "timeoutMs": 180000
+    }
+  ]
+}
