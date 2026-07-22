@@ -8,6 +8,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Changed
 
+- Made English the primary language for public documentation and activation examples, with equivalent requests still supported in other languages.
+- Reworked public copy for a clearer maintainer voice and replaced em dashes with plain punctuation.
+- Corrected stale command-count and Gemini compatibility language in supporting documentation.
 - Classified Gemini CLI as native-limited for Agent Skill discovery while continuing to make no hook-interception claim.
 - Redesigned the repository landing page around a clearer quick start, workflow, compatibility contract, reproducible evidence, and safety guarantees.
 - Expanded package metadata for more accurate discovery across AI coding-agent and developer-tool searches.
@@ -31,7 +34,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Local `.terseforge` artifacts, JSONL metrics, benchmark reports, integration assets, and handoffs.
 - Progressive TypeScript/JavaScript mapping and lexical context selection.
 - Configurable, required/optional quality gates.
-- Honest Claude Code, Codex, Gemini CLI, AGENTS.md, Cursor, Windsurf, and Cline assets.
+- Claude Code, Codex, Gemini CLI, AGENTS.md, Cursor, Windsurf, and Cline assets with explicit compatibility limits.
 - Deterministic component benchmark, cross-platform CI, tests, coverage enforcement, and project documentation.
 
 [Unreleased]: https://github.com/luucabg/terseforge/compare/v0.1.0...HEAD

@@ -27,16 +27,16 @@
 
 ---
 
-TerseForge is a local CLI and instruction toolkit for developers using Claude Code, Codex, Gemini CLI, or another coding agent. It reduces noisy command output, selects TypeScript/JavaScript context progressively, preserves exact raw logs, and runs configured quality gates.
+TerseForge helps coding agents spend less of their context window on terminal noise and broad file reads. It keeps full logs local, surfaces the lines that matter, selects TypeScript and JavaScript context progressively, and runs the checks you choose.
 
-It does not replace your agent, call a model, or send your code to a service.
+It does not replace your agent, call a model, or send your code anywhere.
 
-After a one-time Agent Skill installation, you can activate it naturally:
+Install the Agent Skill once. Then ask your coding agent:
 
-> **Activa TerseForge en este proyecto.**
+> **Activate TerseForge in this project.**
 
 > [!IMPORTANT]
-> TerseForge optimizes what enters context and what is shown—not the quality bar. Errors, warnings, paths, line numbers, commands, diffs, and security findings remain protected. Required quality gates must pass before work is considered verified.
+> TerseForge reduces context and visible output. It does not lower the quality bar. Errors, warnings, paths, line numbers, commands, diffs, and security findings stay protected. Required quality gates must pass before work is considered verified.
 
 ## Keep the signal. Drop the noise.
 
@@ -44,16 +44,16 @@ A long test run may contain hundreds of routine lines and only a few useful diag
 
 TerseForge makes reduction reversible:
 
-| Common agent-workflow problem | TerseForge response |
+| Problem | What TerseForge does |
 | --- | --- |
-| Large terminal logs consume context | Show a compact diagnostic view and store the complete output locally. |
-| An omitted line becomes important later | Recover the exact artifact or any inclusive line range. |
-| The agent reads whole files too early | Rank TS/JS paths, imports, symbols, and snippets within a budget. |
-| Token saving replaces verification | Run explicit typecheck, lint, test, and build gates. |
-| Integration claims are vague | Label each agent as native-limited, instructions-only, or experimental. |
-| Privacy requires another service | Keep state local under `.terseforge/`; send no remote telemetry. |
+| Large terminal logs consume context | Shows a compact diagnostic view and stores the complete output locally. |
+| An omitted line becomes important later | Recovers the exact artifact or any inclusive line range. |
+| The agent reads whole files too early | Ranks TS/JS paths, imports, symbols, and snippets within a budget. |
+| Token savings tempt agents to skip checks | Runs explicit typecheck, lint, test, and build gates. |
+| Integration claims are vague | Labels each agent as native-limited, instructions-only, or experimental. |
+| You do not want to upload code or logs | Keeps state local under `.terseforge/` and sends no remote telemetry. |
 
-**One rule governs the project:** TerseForge may reduce what is displayed, never what can be recovered.
+The rule is simple: compact what the agent sees, but keep the source available.
 
 ## Quick start
 
@@ -75,15 +75,15 @@ terseforge skill install --agent codex
 # or: terseforge skill install --agent gemini
 ```
 
-Start a new agent session, open a repository, and say:
+Start a new agent session, open a repository, and ask:
 
 ```text
-Activa TerseForge en este proyecto.
+Activate TerseForge in this project.
 ```
 
-The skill initializes the repository with the conservative `safe` preset when no configuration exists, installs a project-scoped copy for future sessions, and runs `terseforge doctor`. You can request another preset explicitly, for example `Usa TerseForge lean en este proyecto`.
+If the project has no configuration, the skill starts with the conservative `safe` preset. It also installs a project-scoped copy for future sessions and runs `terseforge doctor`. Ask for another preset when you want one, for example: `Use TerseForge lean in this project.`
 
-You can also initialize it manually. `safe` is intentionally the default:
+Prefer explicit setup? `safe` is still the default:
 
 ```bash
 cd /path/to/your/repository
@@ -132,16 +132,16 @@ tracked files → TS/JS candidates → imports and symbols → ranked snippets �
 
 See the [architecture](docs/architecture.md) for module and failure-policy details.
 
-The skill does not silently replace foreign files. Read [natural-language activation](docs/skills.md) for discovery paths, direct invocation, updates, and removal.
+The installer preserves files it does not own. Read [Agent Skill setup](docs/skills.md) for discovery paths, direct invocation, updates, and removal.
 
-## Twelve focused commands
+## CLI commands
 
-| Command | What it gives you |
+| Command | Purpose |
 | --- | --- |
 | `terseforge init` | Conservative configuration plus optional agent instruction files. |
 | `terseforge mode <safe\|lean\|ultra>` | Change only the current preset without resetting configuration. |
 | `terseforge skill install\|status` | Install or inspect the natural-language Agent Skill. |
-| `terseforge doctor` | Runtime, configuration, and honest integration diagnostics. |
+| `terseforge doctor` | Runtime, configuration, and integration diagnostics. |
 | `terseforge exec -- <command> [args...]` | Compact visible output with a complete local artifact. |
 | `terseforge output <run-id> [--lines 20:60]` | Exact recovery of all output or a selected line range. |
 | `terseforge map [--json]` | A compact TS/JS map of imports and top-level symbols. |
@@ -165,7 +165,7 @@ All presets retain diagnostic content. If nearly every line is an error or warni
 
 ## Compatibility
 
-Compatibility describes the mechanism that exists—not the number of product logos in the README.
+Compatibility is based on what the integration can do, not on how many product logos fit in the README.
 
 | Agent | v0.1 level | Available today | Not claimed |
 | --- | --- | --- | --- |
@@ -173,7 +173,7 @@ Compatibility describes the mechanism that exists—not the number of product lo
 | Codex | **Native-limited** | Native `terseforge` skill, `$terseforge`, `AGENTS.md`, and explicit CLI workflow. | Automatic replacement of tool results. |
 | Gemini CLI | **Native-limited** | Native `terseforge` Agent Skill, natural-language activation, `GEMINI.md`, and explicit CLI workflow. | Stable hook interception. |
 | Other `AGENTS.md` agents | **Instructions-only** | Portable policy and CLI commands. | Runtime enforcement. |
-| Cursor, Windsurf, Cline | **Instructions-only** | Persistent rule-file assets. | Guaranteed command routing. |
+| Cursor, Windsurf, Cline | **Instructions-only** | Persistent rule-file assets. | Automatic command routing. |
 
 **Native-limited** means the agent natively loads an included instruction or skill format. It does not mean TerseForge transparently controls the agent. Read the complete [compatibility contract](docs/compatibility.md).
 
@@ -244,7 +244,7 @@ Command output can contain secrets. Raw artifacts use owner-only permissions whe
 
 ## Project status
 
-TerseForge `v0.1.0` is an experimental, working MVP for Node.js 22 and 24 on Windows, macOS, and Linux. CI runs type checking, ESLint, 45 tests with coverage thresholds, a production build, CLI smoke tests, and the component benchmark.
+TerseForge `v0.1.0` is an experimental, working MVP for Node.js 22 and 24 on Windows, macOS, and Linux. CI runs type checking, ESLint, tests with coverage thresholds, a production build, CLI smoke tests, and the component benchmark.
 
 Deliberate v0.1 exclusions:
 
@@ -261,7 +261,7 @@ Deliberate v0.1 exclusions:
 - [Architecture and failure policy](docs/architecture.md)
 - [Configuration reference](docs/configuration.md)
 - [Compatibility contract](docs/compatibility.md)
-- [Natural-language activation](docs/skills.md)
+- [Agent Skill setup](docs/skills.md)
 - [Benchmark methodology](docs/benchmarking.md)
 - [Privacy model](docs/privacy.md)
 - [Brand and messaging guidelines](docs/brand-guidelines.md)

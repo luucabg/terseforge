@@ -67,7 +67,7 @@ describe("project setup and CLI surface", () => {
     await expect(readIntegrationAsset("SKILL.md")).resolves.toContain("name: terseforge");
   });
 
-  it("reports required and optional doctor checks honestly", async () => {
+  it("reports required and optional doctor checks without overstating integrations", async () => {
     const root = await mkdtemp(join(tmpdir(), "terseforge-doctor-"));
     await initializeProject(root, { preset: "safe", install: [] });
 

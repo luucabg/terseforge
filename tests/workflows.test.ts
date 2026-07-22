@@ -45,7 +45,7 @@ describe("quality and measurement workflows", () => {
     expect(result.results[1]).toMatchObject({ name: "failing", exitCode: 2, required: true });
   });
 
-  it("runs an honest deterministic pruning benchmark", async () => {
+  it("runs a deterministic pruning benchmark with explicit scope", async () => {
     const root = await mkdtemp(join(tmpdir(), "terseforge-bench-"));
     const result = await runBenchmark(root);
     const baseline = JSON.parse(await readFile(join(process.cwd(), "benchmarks", "baseline-v0.1.json"), "utf8")) as {

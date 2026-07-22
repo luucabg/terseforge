@@ -9,7 +9,7 @@ terseforge skill install --agent codex
 Then open a repository in a new agent session and say:
 
 ```text
-Activa TerseForge en este proyecto.
+Activate TerseForge in this project.
 ```
 
 The equivalent explicit workflow is:

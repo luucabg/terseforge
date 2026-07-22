@@ -9,4 +9,4 @@ Use TerseForge conservatively to reduce tool-log and context noise without chang
 - Quality gates are mandatory: run `terseforge check` and report every required failure.
 - Keep routine narration brief; give additional detail for security, data, and migration risks.
 
-Integration level: experimental instruction-file compatibility and an explicit local CLI. No Gemini hook interception is claimed in v0.1.
+Integration level: native-limited Agent Skill or instruction-file loading plus an explicit local CLI. No Gemini hook interception is claimed in v0.1.

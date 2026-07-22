@@ -8,6 +8,7 @@ TerseForge v0.1 is one ESM npm package with internal module boundaries. A monore
 | --- | --- |
 | `config` | Validate schema v1, presets, context limits, and argument-array gates. |
 | `project` | Initialize local state, copy integration assets without overwriting user files, and diagnose capabilities. |
+| `skill` | Resolve, inspect, and install native Agent Skill discovery paths without overwriting foreign files. |
 | `runner` | Execute argument arrays, stream full output to an artifact, compact the visible view, and record metrics. |
 | `pruning` | Retain configurable head/tail context and every diagnostic; count exact duplicate diagnostics in lean/ultra. |
 | `storage` | Keep artifacts, JSONL metrics, benchmark reports, integration copies, and handoffs under `.terseforge/`. |
@@ -15,7 +16,7 @@ TerseForge v0.1 is one ESM npm package with internal module boundaries. A monore
 | `gates` | Run explicit configured checks sequentially and fail when a required gate fails. |
 | `benchmark` | Exercise pruning and byte-for-byte recovery on a deterministic fixture. |
 | `workflows` | Aggregate metrics and create Git-aware handoffs. |
-| `cli-program` | Wire the ten public commands to the modules above. |
+| `cli-program` | Wire the public commands to the modules above. |
 
 ## Command-output flow
 
@@ -51,7 +52,7 @@ git-tracked files (fallback: glob + .gitignore)
         -> estimated token budget
 ```
 
-The estimate is clearly an estimate: UTF-8 bytes divided by four, rounded up. Provider-reported tokens are not available to a local CLI and are not fabricated.
+Token counts are estimates. v0.1 divides UTF-8 bytes by four and rounds up. A local CLI cannot access provider-reported token counts, so TerseForge keeps estimated and reported values separate.
 
 ## Failure policy
 

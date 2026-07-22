@@ -1,6 +1,6 @@
 # TerseForge brand guidelines
 
-> Version 1.0 · 2026-07-23
+> Version 1.1 · 2026-07-23
 
 These guidelines keep the project recognizable without turning technical documentation into marketing copy.
 
@@ -36,6 +36,15 @@ TerseForge sounds like an experienced engineer: concise, calm, exact, and willin
 | Brief after the answer is clear | Brief at the expense of safety |
 
 Prefer verbs such as **measure**, **preserve**, **recover**, **verify**, and **compare**. Avoid unsupported phrases such as **revolutionary**, **zero-cost**, **universal integration**, **guaranteed savings**, or **no quality loss**.
+
+## Editorial rules
+
+- Write public documentation in English. The skill may understand equivalent activation requests in other languages, but the canonical examples stay in English.
+- Use active voice, concrete verbs, and short sentences. Sound like an experienced maintainer, not a marketing generator.
+- Prefer periods, commas, colons, and parentheses. Do not use em dashes.
+- Keep headings and feature names in sentence case unless they contain a product name.
+- Explain the practical outcome before the implementation detail.
+- Remove repeated claims. State an important limitation once near the relevant feature, then link to the full contract.
 
 ## Visual system
 
