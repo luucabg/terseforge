@@ -92,7 +92,7 @@ export function createCli(io: CliIo = defaultIo): Command {
 
   program
     .command("doctor")
-    .description("check runtime, configuration, and honest integration levels")
+    .description("check runtime, configuration, and integration levels")
     .action(async () => {
       const report = await diagnoseProject(root());
       for (const check of report.checks) io.stdout(line(`${check.ok ? "PASS" : "FAIL"} ${check.name}: ${check.detail}`));

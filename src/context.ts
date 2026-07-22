@@ -197,7 +197,7 @@ export function formatRepositoryMap(map: RepositoryMap): string {
     .map((file) => {
       const symbols = file.symbols.map((symbol) => `${symbol.kind} ${symbol.name}:${symbol.line}`).join(", ") || "no top-level symbols";
       const imports = file.imports.length > 0 ? ` imports ${file.imports.join(", ")}` : "";
-      return `${file.path} — ${symbols}${imports}`;
+      return `${file.path}: ${symbols}${imports}`;
     })
     .join("\n");
 }

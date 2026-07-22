@@ -49,7 +49,7 @@ describe("Agent Skill installation", () => {
 
     expect(first.status).toBe("installed");
     expect(second.status).toBe("current");
-    await expect(readFile(join(first.destination, "SKILL.md"), "utf8")).resolves.toContain("Activa TerseForge");
+    await expect(readFile(join(first.destination, "SKILL.md"), "utf8")).resolves.toContain("activate TerseForge in this project");
     await expect(readFile(join(first.destination, "agents", "openai.yaml"), "utf8")).resolves.toContain("$terseforge");
 
     const claudeDestination = resolveSkillDestination(root, { agent: "claude", scope: "project" });

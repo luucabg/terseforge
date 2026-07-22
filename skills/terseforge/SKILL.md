@@ -1,6 +1,6 @@
 ---
 name: terseforge
-description: Activate, configure, inspect, or use TerseForge in a coding project. Use when the user says “Activa TerseForge en este proyecto”, “haz que TerseForge esté en este proyecto”, “usa TerseForge safe/lean/ultra”, “change TerseForge mode”, asks whether TerseForge is active, or requests token-efficient coding-agent workflows with recoverable logs and required quality gates.
+description: Activate, configure, inspect, or use TerseForge in a coding project. Use when someone asks to "activate TerseForge in this project," use a safe, lean, or ultra preset, change the TerseForge mode, check whether it is active, or make a coding-agent workflow more token-efficient without weakening verification. Match equivalent requests in any language.
 ---
 
 # TerseForge
