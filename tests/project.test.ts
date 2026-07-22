@@ -3,14 +3,27 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createCli } from "../src/cli-program.js";
+import { createDefaultConfig, loadConfig, setPreset, writeConfig } from "../src/config.js";
 import { diagnoseProject, initializeProject, readIntegrationAsset } from "../src/project.js";
+import { installSkill } from "../src/skill.js";
 import { selectArtifactLines } from "../src/output.js";
 
 describe("project setup and CLI surface", () => {
   it("exposes every documented MVP command", () => {
     const names = createCli().commands.map((command) => command.name());
 
-    expect(names).toEqual(["init", "doctor", "exec", "output", "map", "context", "check", "handoff", "stats", "bench"]);
+    expect(names).toEqual(["init", "mode", "skill", "doctor", "exec", "output", "map", "context", "check", "handoff", "stats", "bench"]);
+  });
+
+  it("changes only the configured preset", async () => {
+    const root = await mkdtemp(join(tmpdir(), "terseforge-mode-"));
+    await writeConfig(root, { ...createDefaultConfig(), context: { budgetTokens: 987, maxFileBytes: 200_000 } });
+
+    const changed = await setPreset(root, "lean");
+
+    expect(changed.preset).toBe("lean");
+    expect(changed.context.budgetTokens).toBe(987);
+    await expect(loadConfig(root)).resolves.toEqual(changed);
   });
 
   it("initializes safe local state and installs selected instructions", async () => {
@@ -63,6 +76,26 @@ describe("project setup and CLI surface", () => {
     expect(report.ok).toBe(true);
     expect(report.checks).toEqual(expect.arrayContaining([expect.objectContaining({ name: "Node.js >=22", ok: true })]));
     expect(report.integrations.every((integration) => ["native-limited", "instructions-only", "experimental"].includes(integration.level))).toBe(true);
+  });
+
+  it("recognizes native project skills for Codex, Claude Code, and Gemini CLI", async () => {
+    const root = await mkdtemp(join(tmpdir(), "terseforge-doctor-skills-"));
+    await initializeProject(root, { preset: "safe" });
+    await Promise.all([
+      installSkill(root, { agent: "codex", scope: "project" }),
+      installSkill(root, { agent: "claude", scope: "project" }),
+      installSkill(root, { agent: "gemini", scope: "project" })
+    ]);
+
+    const report = await diagnoseProject(root);
+
+    expect(report.integrations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Codex", installed: true, level: "native-limited" }),
+        expect.objectContaining({ name: "Claude Code", installed: true, level: "native-limited" }),
+        expect.objectContaining({ name: "Gemini CLI", installed: true, level: "native-limited" })
+      ])
+    );
   });
 
   it("fails doctor when required configuration is missing", async () => {

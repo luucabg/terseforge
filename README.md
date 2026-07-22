@@ -31,6 +31,10 @@ TerseForge is a local CLI and instruction toolkit for developers using Claude Co
 
 It does not replace your agent, call a model, or send your code to a service.
 
+After a one-time Agent Skill installation, you can activate it naturally:
+
+> **Activa TerseForge en este proyecto.**
+
 > [!IMPORTANT]
 > TerseForge optimizes what enters context and what is shown—not the quality bar. Errors, warnings, paths, line numbers, commands, diffs, and security findings remain protected. Required quality gates must pass before work is considered verified.
 
@@ -63,7 +67,23 @@ npm run build
 npm link
 ```
 
-Initialize it inside a repository. `safe` is intentionally the default:
+Install the native Agent Skill once for the agent you use:
+
+```bash
+terseforge skill install --agent codex
+# or: terseforge skill install --agent claude
+# or: terseforge skill install --agent gemini
+```
+
+Start a new agent session, open a repository, and say:
+
+```text
+Activa TerseForge en este proyecto.
+```
+
+The skill initializes the repository with the conservative `safe` preset when no configuration exists, installs a project-scoped copy for future sessions, and runs `terseforge doctor`. You can request another preset explicitly, for example `Usa TerseForge lean en este proyecto`.
+
+You can also initialize it manually. `safe` is intentionally the default:
 
 ```bash
 cd /path/to/your/repository
@@ -112,11 +132,15 @@ tracked files → TS/JS candidates → imports and symbols → ranked snippets �
 
 See the [architecture](docs/architecture.md) for module and failure-policy details.
 
-## Ten focused commands
+The skill does not silently replace foreign files. Read [natural-language activation](docs/skills.md) for discovery paths, direct invocation, updates, and removal.
+
+## Twelve focused commands
 
 | Command | What it gives you |
 | --- | --- |
 | `terseforge init` | Conservative configuration plus optional agent instruction files. |
+| `terseforge mode <safe\|lean\|ultra>` | Change only the current preset without resetting configuration. |
+| `terseforge skill install\|status` | Install or inspect the natural-language Agent Skill. |
 | `terseforge doctor` | Runtime, configuration, and honest integration diagnostics. |
 | `terseforge exec -- <command> [args...]` | Compact visible output with a complete local artifact. |
 | `terseforge output <run-id> [--lines 20:60]` | Exact recovery of all output or a selected line range. |
@@ -145,9 +169,9 @@ Compatibility describes the mechanism that exists—not the number of product lo
 
 | Agent | v0.1 level | Available today | Not claimed |
 | --- | --- | --- | --- |
-| Claude Code | **Native-limited** | `CLAUDE.md`, reusable skill asset, explicit CLI workflow. | Automatic interception of every tool call. |
-| Codex | **Native-limited** | `AGENTS.md`, reusable skill asset, explicit CLI workflow. | Automatic replacement of tool results. |
-| Gemini CLI | **Experimental** | `GEMINI.md` asset and explicit CLI workflow. | Stable hook interception. |
+| Claude Code | **Native-limited** | Native `terseforge` skill, `/terseforge`, `CLAUDE.md`, and explicit CLI workflow. | Automatic interception of every tool call. |
+| Codex | **Native-limited** | Native `terseforge` skill, `$terseforge`, `AGENTS.md`, and explicit CLI workflow. | Automatic replacement of tool results. |
+| Gemini CLI | **Native-limited** | Native `terseforge` Agent Skill, natural-language activation, `GEMINI.md`, and explicit CLI workflow. | Stable hook interception. |
 | Other `AGENTS.md` agents | **Instructions-only** | Portable policy and CLI commands. | Runtime enforcement. |
 | Cursor, Windsurf, Cline | **Instructions-only** | Persistent rule-file assets. | Guaranteed command routing. |
 
@@ -220,7 +244,7 @@ Command output can contain secrets. Raw artifacts use owner-only permissions whe
 
 ## Project status
 
-TerseForge `v0.1.0` is an experimental, working MVP for Node.js 22 and 24 on Windows, macOS, and Linux. CI runs type checking, ESLint, 37 tests with coverage thresholds, a production build, CLI smoke tests, and the component benchmark.
+TerseForge `v0.1.0` is an experimental, working MVP for Node.js 22 and 24 on Windows, macOS, and Linux. CI runs type checking, ESLint, 45 tests with coverage thresholds, a production build, CLI smoke tests, and the component benchmark.
 
 Deliberate v0.1 exclusions:
 
@@ -237,6 +261,7 @@ Deliberate v0.1 exclusions:
 - [Architecture and failure policy](docs/architecture.md)
 - [Configuration reference](docs/configuration.md)
 - [Compatibility contract](docs/compatibility.md)
+- [Natural-language activation](docs/skills.md)
 - [Benchmark methodology](docs/benchmarking.md)
 - [Privacy model](docs/privacy.md)
 - [Brand and messaging guidelines](docs/brand-guidelines.md)

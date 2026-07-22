@@ -48,6 +48,9 @@ describe("CLI end-to-end workflow", () => {
     );
 
     const initialized = await runCli(root, ["init", "--install", "codex", "claude"]);
+    const mode = await runCli(root, ["mode", "lean"]);
+    const skillInstall = await runCli(root, ["skill", "install", "--agent", "codex", "--scope", "project"]);
+    const skillStatus = await runCli(root, ["skill", "status", "--agent", "codex", "--scope", "project"]);
     const doctor = await runCli(root, ["doctor"]);
     const map = await runCli(root, ["map"]);
     const jsonMap = await runCli(root, ["map", "--json"]);
@@ -65,6 +68,9 @@ describe("CLI end-to-end workflow", () => {
     const handoff = await runCli(root, ["handoff", "Ship", "fixture"]);
 
     expect(initialized.stdout).toContain("terseforge.config.json");
+    expect(mode.stdout).toContain("Preset: lean");
+    expect(skillInstall.stdout).toContain("Skill installed:");
+    expect(skillStatus.stdout).toContain("current");
     expect(doctor.stdout).toContain("PASS Node.js >=22");
     expect(map.stdout).toContain("validateToken");
     expect(JSON.parse(jsonMap.stdout)).toMatchObject({ files: [expect.objectContaining({ path: "auth.ts" })] });

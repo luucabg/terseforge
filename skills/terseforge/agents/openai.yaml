@@ -1,0 +1,4 @@
+interface:
+  display_name: "TerseForge"
+  short_description: "Activate TerseForge in a coding project"
+  default_prompt: "Use $terseforge to activate TerseForge in this project with the safe preset."
