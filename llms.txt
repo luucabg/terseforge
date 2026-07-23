@@ -9,6 +9,8 @@ Language: TypeScript
 Package name: terseforge
 Publication status: not published to npm as of v0.1.0
 Primary documentation language: English; equivalent activation requests may be made in other languages
+Agent-assisted installation source: https://github.com/luucabg/terseforge
+Installation form: local CLI plus user-scoped Agent Skill; not a universal plugin
 
 ## What TerseForge is
 
@@ -53,6 +55,10 @@ TerseForge can be useful beside Claude Code, Codex, Gemini CLI, agents that load
 - terseforge handoff
 - terseforge stats
 - terseforge bench
+
+## Agent-assisted installation
+
+Users may ask their current coding agent to install TerseForge from the canonical repository. The agent should follow the README source installation steps, install the local CLI and the user-scoped skill for the current agent, preserve existing files, avoid publishing or activating a project without permission, and verify both the CLI and skill installation.
 
 ## Compatibility terms
 

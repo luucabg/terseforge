@@ -57,6 +57,22 @@ The rule is simple: compact what the agent sees, but keep the source available.
 
 ## Quick start
 
+### Ask your coding agent to install it
+
+TerseForge is an Agent Skill plus a local CLI, not a universal plugin. To install it from [luucabg/terseforge](https://github.com/luucabg/terseforge), paste this into Codex, Claude Code, or Gemini CLI:
+
+```text
+Install TerseForge from https://github.com/luucabg/terseforge for the coding agent I am using.
+Follow the repository's source installation instructions.
+Install both the local CLI and the user-scoped Agent Skill for the current agent.
+Make `terseforge` available in future terminal sessions.
+Preserve existing configuration and agent files.
+Do not publish anything or activate TerseForge in the current project yet.
+Verify the installation with `terseforge --version` and `terseforge skill status --agent <current-agent> --scope user`.
+```
+
+### Install it yourself
+
 TerseForge is not published to npm yet. Install the v0.1 MVP from source:
 
 ```bash
@@ -74,6 +90,8 @@ terseforge skill install --agent codex
 # or: terseforge skill install --agent claude
 # or: terseforge skill install --agent gemini
 ```
+
+### Activate it in a project
 
 Start a new agent session, open a repository, and ask:
 
