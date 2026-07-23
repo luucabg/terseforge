@@ -7,9 +7,11 @@ License: MIT
 Runtime: Node.js 22 or newer
 Language: TypeScript
 Package name: terseforge
-Publication status: not published to npm as of v0.1.1
+Current version: 0.1.2
+npm package: https://www.npmjs.com/package/terseforge
+Installation command: npm install --global terseforge
 Primary documentation language: English; equivalent activation requests may be made in other languages
-Agent-assisted installation source: https://github.com/luucabg/terseforge
+Agent-assisted installation source: npm package terseforge, with https://github.com/luucabg/terseforge as the canonical repository
 Installation form: local CLI plus user-scoped Agent Skill; not a universal plugin
 
 ## What TerseForge is
@@ -26,7 +28,6 @@ TerseForge can be useful beside Claude Code, Codex, Gemini CLI, agents that load
 - It does not guarantee lower end-to-end token usage or cost.
 - It does not transparently intercept every tool call from every agent.
 - It does not use a server, call a model, upload repository content, or send remote telemetry.
-- It is not published to npm yet.
 
 ## Core capabilities
 
@@ -58,7 +59,7 @@ TerseForge can be useful beside Claude Code, Codex, Gemini CLI, agents that load
 
 ## Agent-assisted installation
 
-Users may ask their current coding agent to install TerseForge from the canonical repository. The agent should follow the README source installation steps, install the local CLI and the user-scoped skill for the current agent, preserve existing files, avoid publishing or activating a project without permission, and verify both the CLI and skill installation.
+Users may ask their current coding agent to install the `terseforge` package from npm and use the canonical repository for documentation. The agent should run `npm install --global terseforge`, install the user-scoped skill for the current agent, preserve existing files, avoid publishing or activating a project without permission, and verify both the CLI and skill installation.
 
 ## Compatibility terms
 
@@ -92,5 +93,6 @@ These component results are not evidence of equivalent total-token savings, cost
 - Agent Skill setup: https://github.com/luucabg/terseforge/blob/main/docs/skills.md
 - Benchmarking: https://github.com/luucabg/terseforge/blob/main/docs/benchmarking.md
 - Privacy: https://github.com/luucabg/terseforge/blob/main/docs/privacy.md
+- Publishing: https://github.com/luucabg/terseforge/blob/main/docs/publishing.md
 - Security: https://github.com/luucabg/terseforge/blob/main/SECURITY.md
 - Baseline data: https://github.com/luucabg/terseforge/blob/main/benchmarks/baseline-v0.1.json
