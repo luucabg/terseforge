@@ -54,7 +54,7 @@ export function createCli(io: CliIo = defaultIo): Command {
   program
     .name("terseforge")
     .description("Big code. Small chatter. Local optimization for AI coding-agent workflows.")
-    .version("0.1.1")
+    .version("0.1.2")
     .option("--cwd <path>", "repository root", process.cwd())
     .configureOutput({ writeOut: io.stdout, writeErr: io.stderr });
   program.enablePositionalOptions();

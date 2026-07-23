@@ -11,7 +11,8 @@
 
 <p align="center">
   <a href="https://github.com/luucabg/terseforge/actions/workflows/ci.yml"><img alt="CI status" src="https://github.com/luucabg/terseforge/actions/workflows/ci.yml/badge.svg"></a>
-  <a href="https://github.com/luucabg/terseforge/releases/tag/v0.1.1"><img alt="Release v0.1.1" src="https://img.shields.io/badge/release-v0.1.1-E86A17"></a>
+  <a href="https://www.npmjs.com/package/terseforge"><img alt="npm version" src="https://img.shields.io/npm/v/terseforge?color=CB3837&logo=npm"></a>
+  <a href="https://github.com/luucabg/terseforge/releases/tag/v0.1.2"><img alt="Release v0.1.2" src="https://img.shields.io/badge/release-v0.1.2-E86A17"></a>
   <img alt="Node.js 22 or newer" src="https://img.shields.io/badge/Node.js-22%2B-5FA04E?logo=nodedotjs&logoColor=white">
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-2563EB"></a>
   <img alt="No remote telemetry" src="https://img.shields.io/badge/remote_telemetry-none-111827">
@@ -62,8 +63,9 @@ The rule is simple: compact what the agent sees, but keep the source available.
 TerseForge is an Agent Skill plus a local CLI, not a universal plugin. To install it from [luucabg/terseforge](https://github.com/luucabg/terseforge), paste this into Codex, Claude Code, or Gemini CLI:
 
 ```text
-Install TerseForge from https://github.com/luucabg/terseforge for the coding agent I am using.
-Follow the repository's source installation instructions.
+Install the `terseforge` package from npm for the coding agent I am using.
+Use https://github.com/luucabg/terseforge as the canonical project and documentation source.
+Run `npm install --global terseforge` to make the CLI available.
 Install both the local CLI and the user-scoped Agent Skill for the current agent.
 Make `terseforge` available in future terminal sessions.
 Preserve existing configuration and agent files.
@@ -73,15 +75,14 @@ Verify the installation with `terseforge --version` and `terseforge skill status
 
 ### Install it yourself
 
-TerseForge is not published to npm yet. Install the v0.1 MVP from source:
+Install the public package with npm:
 
 ```bash
-git clone https://github.com/luucabg/terseforge.git
-cd terseforge
-npm ci
-npm run build
-npm link
+npm install --global terseforge
+terseforge --version
 ```
+
+The package page is [npmjs.com/package/terseforge](https://www.npmjs.com/package/terseforge). Contributors can still build from source using the steps in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Install the native Agent Skill once for the agent you use:
 
@@ -265,7 +266,7 @@ Command output can contain secrets. Raw artifacts use owner-only permissions whe
 
 ## Project status
 
-TerseForge `v0.1.1` is an experimental, working MVP for Node.js 22 and 24 on Windows, macOS, and Linux. CI runs type checking, ESLint, tests with coverage thresholds, a production build, CLI smoke tests, and the component benchmark.
+TerseForge `v0.1.2` is an experimental, working MVP published on npm for Node.js 22 and 24 on Windows, macOS, and Linux. CI runs type checking, ESLint, tests with coverage thresholds, a production build, CLI smoke tests, and the component benchmark.
 
 Context discovery parses each eligible file once per command, but it does not yet maintain a persistent incremental index. For very large monorepos, scope commands with `--cwd <workspace>`; enterprise-scale indexing remains future work rather than a current claim.
 
@@ -277,7 +278,7 @@ Deliberate v0.1 exclusions:
 - no automatic transcript or session interception;
 - no custom diff engine;
 - no claim of complete support for every coding agent;
-- no npm publication yet.
+- no automatic modification of a project before explicit activation.
 
 ## Documentation
 
@@ -288,6 +289,7 @@ Deliberate v0.1 exclusions:
 - [Benchmark methodology](docs/benchmarking.md)
 - [Privacy model](docs/privacy.md)
 - [Brand and messaging guidelines](docs/brand-guidelines.md)
+- [Maintainer publishing guide](docs/publishing.md)
 - [Machine-readable project summary](llms.txt)
 - [Example workflow](examples/README.md)
 - [Changelog](CHANGELOG.md)

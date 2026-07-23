@@ -34,11 +34,14 @@ describe("public copy", () => {
 
     expect(readme).toContain(`[luucabg/terseforge](${repository})`);
     for (const text of [readme, guide]) {
-      expect(text).toContain(`Install TerseForge from ${repository}`);
+      expect(text).toContain("Install the `terseforge` package from npm");
+      expect(text).toContain(`Use ${repository} as the canonical project and documentation source.`);
+      expect(text).toContain("npm install --global terseforge");
       expect(text).toContain("Install both the local CLI and the user-scoped Agent Skill");
       expect(text).toContain("Do not publish anything");
       expect(text).toContain("Activate TerseForge in this project.");
     }
-    expect(llms).toContain(`Agent-assisted installation source: ${repository}`);
+    expect(llms).toContain(`with ${repository} as the canonical repository`);
+    expect(llms).toContain("npm package: https://www.npmjs.com/package/terseforge");
   });
 });

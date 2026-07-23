@@ -1,6 +1,6 @@
 {
   "name": "terseforge",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Local CLI for reducing context and tool-output noise in AI coding-agent workflows without sacrificing verification or code quality.",
   "type": "module",
   "bin": {

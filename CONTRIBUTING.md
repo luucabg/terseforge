@@ -37,3 +37,7 @@ Coverage thresholds are 80% globally for statements, branches, functions, and li
 ## Pull requests
 
 Keep commits focused and explain why the change is needed. Include reproducible verification output. Avoid generated logs, `.terseforge/`, credentials, and benchmark run artifacts in commits.
+
+## Maintainer releases
+
+Public releases use the token-free GitHub trusted publisher in `.github/workflows/publish.yml`. Do not add an npm token to repository secrets. Follow [docs/publishing.md](docs/publishing.md) for versioning, tagging, verification, and workflow dispatch.
