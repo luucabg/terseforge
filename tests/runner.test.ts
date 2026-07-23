@@ -53,10 +53,76 @@ describe("process runner", () => {
       args: ["-e", "setInterval(() => {}, 1000)"],
       preset: "safe",
       kind: "exec",
-      timeoutMs: 50
+      timeoutMs: 50,
+      terminationGraceMs: 100
     });
     expect(timeout.metric.timedOut).toBe(true);
     expect(timeout.exitCode).not.toBe(0);
+  });
+
+  it("bounds timeout escalation for a process tree that keeps output pipes open", async () => {
+    const root = await mkdtemp(join(tmpdir(), "terseforge-runner-tree-timeout-"));
+    const script = [
+      "const { spawn } = require('node:child_process')",
+      "spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: ['ignore', 'inherit', 'inherit'] })",
+      "process.on('SIGTERM', () => {})",
+      "setInterval(() => {}, 1000)"
+    ].join(";");
+    const started = Date.now();
+
+    const result = await runProcess({
+      root,
+      command: process.execPath,
+      args: ["-e", script],
+      preset: "safe",
+      kind: "exec",
+      timeoutMs: 50,
+      terminationGraceMs: 100
+    });
+
+    expect(result.metric.timedOut).toBe(true);
+    expect(result.exitCode).not.toBe(0);
+    expect(Date.now() - started).toBeLessThan(5_000);
+  });
+
+  it("stores stdout and stderr separately alongside the merged best-effort view", async () => {
+    const root = await mkdtemp(join(tmpdir(), "terseforge-runner-streams-"));
+    const result = await runProcess({
+      root,
+      command: process.execPath,
+      args: ["-e", "process.stdout.write('out'); process.stderr.write('err')"],
+      preset: "safe",
+      kind: "exec"
+    });
+
+    await expect(readArtifact(root, result.id, "stdout")).resolves.toBe("out");
+    await expect(readArtifact(root, result.id, "stderr")).resolves.toBe("err");
+    const events = (await readArtifact(root, result.id, "events"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as { sequence: number; stream: string; offset: number; length: number });
+    expect(events.map((event) => event.sequence)).toEqual(events.map((_, index) => index));
+    expect(events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ stream: "stdout", offset: 0, length: 3 }),
+        expect.objectContaining({ stream: "stderr", offset: 0, length: 3 })
+      ])
+    );
+    expect(result.metric).toMatchObject({ stdoutBytes: 3, stderrBytes: 3 });
+  });
+
+  it("does not merge partial stdout and stderr lines in the compacted view", async () => {
+    const root = await mkdtemp(join(tmpdir(), "terseforge-runner-partial-streams-"));
+    const script = [
+      "process.stdout.write('partial stdout')",
+      "process.stderr.write('error: separate stderr\\n')",
+      "setTimeout(() => process.stdout.write(' completed\\n'), 20)"
+    ].join(";");
+
+    const result = await runProcess({ root, command: process.execPath, args: ["-e", script], preset: "safe", kind: "exec" });
+
+    expect(result.visibleOutput.split("\n")).toContain("error: separate stderr");
+    expect(result.visibleOutput).not.toContain("stdouterror:");
   });
 
   it("does not corrupt UTF-8 diagnostics split across process chunks", async () => {

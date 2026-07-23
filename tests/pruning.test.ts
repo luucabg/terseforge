@@ -36,4 +36,25 @@ describe("recoverable output pruning", () => {
 
     expect(result.text).toMatch(/error TS2322.*repeated 2x/);
   });
+
+  it("retains multiline diagnostic context and stack frames", () => {
+    const input = [
+      ...Array.from({ length: 30 }, (_, index) => `routine ${index}`),
+      "Error: request failed",
+      "    at validateToken (src/auth.ts:40:7)",
+      "    at handleRequest (src/server.ts:18:3)",
+      "Received: 401",
+      ...Array.from({ length: 30 }, (_, index) => `cleanup ${index}`)
+    ].join("\n");
+
+    const result = pruneText(input, "ultra");
+
+    expect(result.text).toContain("Error: request failed");
+    expect(result.text).toContain("at validateToken");
+    expect(result.text).toContain("at handleRequest");
+  });
+
+  it("handles empty output without inventing visible lines", () => {
+    expect(pruneText("", "safe")).toMatchObject({ text: "", rawLines: 0, visibleLines: 0, omittedLines: 0 });
+  });
 });

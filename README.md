@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="https://github.com/luucabg/terseforge/actions/workflows/ci.yml"><img alt="CI status" src="https://github.com/luucabg/terseforge/actions/workflows/ci.yml/badge.svg"></a>
-  <a href="https://github.com/luucabg/terseforge/releases/tag/v0.1.0"><img alt="Release v0.1.0" src="https://img.shields.io/badge/release-v0.1.0-E86A17"></a>
+  <a href="https://github.com/luucabg/terseforge/releases/tag/v0.1.1"><img alt="Release v0.1.1" src="https://img.shields.io/badge/release-v0.1.1-E86A17"></a>
   <img alt="Node.js 22 or newer" src="https://img.shields.io/badge/Node.js-22%2B-5FA04E?logo=nodedotjs&logoColor=white">
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-2563EB"></a>
   <img alt="No remote telemetry" src="https://img.shields.io/badge/remote_telemetry-none-111827">
@@ -47,9 +47,9 @@ TerseForge makes reduction reversible:
 | Problem | What TerseForge does |
 | --- | --- |
 | Large terminal logs consume context | Shows a compact diagnostic view and stores the complete output locally. |
-| An omitted line becomes important later | Recovers the exact artifact or any inclusive line range. |
-| The agent reads whole files too early | Ranks TS/JS paths, imports, symbols, and snippets within a budget. |
-| Token savings tempt agents to skip checks | Runs explicit typecheck, lint, test, and build gates. |
+| An omitted line becomes important later | Recovers stored bytes, original line endings, or the exact stdout/stderr stream. |
+| The agent reads whole files too early | Ranks TS/JS paths, imports, symbols, related files, and multiple snippets within a budget. |
+| Token savings tempt agents to skip checks | Detects explicit project scripts and fails closed when required verification is absent. |
 | Integration claims are vague | Labels each agent as native-limited, instructions-only, or experimental. |
 | You do not want to upload code or logs | Keeps state local under `.terseforge/` and sends no remote telemetry. |
 
@@ -123,6 +123,7 @@ If compact output omits something you need, recover it byte for byte:
 ```bash
 terseforge output <run-id>
 terseforge output <run-id> --lines 100:180
+terseforge output <run-id> --stream stderr
 ```
 
 `init` never overwrites an existing agent instruction file. It installs only the integrations explicitly named with `--install` and keeps reference copies under `.terseforge/integrations/`.
@@ -133,19 +134,19 @@ terseforge output <run-id> --lines 100:180
 flowchart LR
     A["Developer or coding agent"] --> B["TerseForge CLI"]
     B --> C["Run command safely"]
-    C --> D["Exact local artifact"]
+    C --> D["Local output artifacts"]
     C --> E["Compact diagnostic view"]
     D --> F["Recover with terseforge output"]
     E --> G["Smaller visible context"]
     B --> H["Configured quality gates"]
 ```
 
-The CLI uses executable-and-argument arrays rather than a user-controlled shell expression. Successful process launches write the complete byte stream to `.terseforge/artifacts/`, while the visible view retains diagnostics and adds an exact recovery command.
+The CLI uses executable-and-argument arrays rather than a user-controlled shell expression. Successful process launches store stdout and stderr byte for byte, plus a merged best-effort view and a sequenced event log. `terseforge output` writes stored bytes directly to stdout without adding a newline or decoding the content. The merged view preserves observed chunk arrival order, but it is not presented as an exact reconstruction of terminal interleaving.
 
 Context selection follows a separate progressive path:
 
 ```text
-tracked files → TS/JS candidates → imports and symbols → ranked snippets → token estimate
+tracked and untracked files → TS/JS candidates → imports and symbols → related files → ranked snippets → token estimate
 ```
 
 See the [architecture](docs/architecture.md) for module and failure-policy details.
@@ -161,8 +162,8 @@ The installer preserves files it does not own. Read [Agent Skill setup](docs/ski
 | `terseforge skill install\|status` | Install or inspect the natural-language Agent Skill. |
 | `terseforge doctor` | Runtime, configuration, and integration diagnostics. |
 | `terseforge exec -- <command> [args...]` | Compact visible output with a complete local artifact. |
-| `terseforge output <run-id> [--lines 20:60]` | Exact recovery of all output or a selected line range. |
-| `terseforge map [--json]` | A compact TS/JS map of imports and top-level symbols. |
+| `terseforge output <run-id> [--lines 20:60] [--stream stdout]` | Byte-preserving recovery of merged or source-stream output. |
+| `terseforge map [--json] [--max-files 500]` | A bounded TS/JS map of imports and top-level symbols. |
 | `terseforge context "query" [--symbol name]` | Ranked, numbered snippets within a configurable budget. |
 | `terseforge check` | Configured gates; required failures return a non-zero exit code. |
 | `terseforge handoff "objective"` | A deterministic local session handoff. |
@@ -179,7 +180,7 @@ Visible-byte statistics include the recovery instruction itself. Very short outp
 | **`lean`** | 25 / 25 lines | Exact duplicates counted | Daily work after validating the repository. |
 | **`ultra`** | 10 / 10 lines | Exact duplicates counted | Explicitly chosen low-chatter workflows. |
 
-All presets retain diagnostic content. If nearly every line is an error or warning, the compact output may remain large. Correctness wins over compression.
+All presets retain diagnostic lines plus nearby multiline context such as stack frames and source excerpts. If nearly every line is diagnostic, the compact output may remain large. Correctness wins over compression.
 
 ## Compatibility
 
@@ -197,13 +198,13 @@ Compatibility is based on what the integration can do, not on how many product l
 
 ## Measured component benchmark
 
-The included benchmark generates a fixed 504-line synthetic TypeScript test log, compresses it with every preset, checks that known diagnostics remain visible, and verifies byte-for-byte raw recovery.
+The included benchmark generates a fixed 504-line synthetic TypeScript test log, compresses it with every preset, checks that known diagnostics and nearby context remain visible, and verifies byte-for-byte stored-artifact recovery.
 
 | Preset | Visible-byte reduction | Diagnostics retained | Raw output recoverable |
 | --- | ---: | :---: | :---: |
-| `safe` | 75.78% | Yes | Yes |
-| `lean` | 88.99% | Yes | Yes |
-| `ultra` | 94.64% | Yes | Yes |
+| `safe` | 73.55% | Yes | Yes |
+| `lean` | 86.76% | Yes | Yes |
+| `ultra` | 92.41% | Yes | Yes |
 
 Run it yourself:
 
@@ -247,6 +248,8 @@ The committed result is in [`benchmarks/baseline-v0.1.json`](benchmarks/baseline
 
 Commands and arguments stay separate. Shell expressions such as `npm test && deploy` are rejected. v0.1 records artifact-retention intent but does not delete artifacts automatically. See the [configuration reference](docs/configuration.md).
 
+`terseforge init` detects existing `typecheck`, `lint`, `test`, and `build` package scripts and writes only those gates, without `--if-present`. If no gates are configured, `terseforge check` exits non-zero and records verification as not configured.
+
 ## Local by design
 
 | Property | v0.1 behavior |
@@ -254,7 +257,7 @@ Commands and arguments stay separate. Shell expressions such as `npm test && dep
 | Server | None required or included. |
 | Model calls | None. TerseForge is not an LLM proxy. |
 | Remote telemetry | None. The configuration only accepts `false`. |
-| Stored data | Artifacts, metrics, reports, and handoffs under `.terseforge/`. |
+| Stored data | Per-stream artifacts, merged output, event logs, metrics, reports, and handoffs under `.terseforge/`. |
 | Process execution | Argument arrays; no concatenated user-controlled shell expression. |
 | Failure policy | Compression remains recoverable; required quality gates fail closed. |
 
@@ -262,7 +265,9 @@ Command output can contain secrets. Raw artifacts use owner-only permissions whe
 
 ## Project status
 
-TerseForge `v0.1.0` is an experimental, working MVP for Node.js 22 and 24 on Windows, macOS, and Linux. CI runs type checking, ESLint, tests with coverage thresholds, a production build, CLI smoke tests, and the component benchmark.
+TerseForge `v0.1.1` is an experimental, working MVP for Node.js 22 and 24 on Windows, macOS, and Linux. CI runs type checking, ESLint, tests with coverage thresholds, a production build, CLI smoke tests, and the component benchmark.
+
+Context discovery parses each eligible file once per command, but it does not yet maintain a persistent incremental index. For very large monorepos, scope commands with `--cwd <workspace>`; enterprise-scale indexing remains future work rather than a current claim.
 
 Deliberate v0.1 exclusions:
 

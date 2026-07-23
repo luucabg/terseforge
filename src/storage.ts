@@ -5,6 +5,8 @@ import { join } from "node:path";
 import type { Preset } from "./config.js";
 
 export type RunKind = "exec" | "gate";
+export type ArtifactChannel = "merged" | "stdout" | "stderr" | "events";
+export type RecordedGateStatus = "passed" | "failed" | "timed_out" | "not_configured";
 
 export interface RunMetric {
   schemaVersion: 1;
@@ -12,7 +14,7 @@ export interface RunMetric {
   kind: RunKind;
   preset: Preset;
   command: string;
-  exitCode: number;
+  exitCode: number | null;
   startedAt: string;
   durationMs: number;
   rawBytes: number;
@@ -23,6 +25,17 @@ export interface RunMetric {
   estimatedInputTokens: number;
   estimatedVisibleTokens: number;
   timedOut?: boolean;
+  forcedTermination?: boolean;
+  terminationFailed?: boolean;
+  stdoutBytes?: number;
+  stderrBytes?: number;
+  checkId?: string;
+  checkGateIndex?: number;
+  checkGateCount?: number;
+  checkCompleted?: boolean;
+  gateName?: string;
+  gateRequired?: boolean;
+  gateStatus?: RecordedGateStatus;
 }
 
 export interface ArtifactWriter {
@@ -32,6 +45,12 @@ export interface ArtifactWriter {
 }
 
 const RUN_ID_PATTERN = /^[a-zA-Z0-9_-]{1,120}$/u;
+const ARTIFACT_SUFFIXES: Record<ArtifactChannel, string> = {
+  merged: ".log",
+  stdout: ".stdout.log",
+  stderr: ".stderr.log",
+  events: ".events.jsonl"
+};
 
 export function createRunId(prefix = "run"): string {
   return `${prefix}_${Date.now().toString(36)}_${randomBytes(4).toString("hex")}`;
@@ -53,17 +72,18 @@ function validateRunId(id: string): void {
   if (!RUN_ID_PATTERN.test(id)) throw new Error(`Invalid output identifier: ${id}`);
 }
 
-export function artifactPath(root: string, id: string): string {
+export function artifactPath(root: string, id: string, channel: ArtifactChannel = "merged"): string {
   validateRunId(id);
-  return join(statePath(root), "artifacts", `${id}.log`);
+  if (!Object.hasOwn(ARTIFACT_SUFFIXES, channel)) throw new Error(`Invalid artifact channel: ${channel}`);
+  return join(statePath(root), "artifacts", `${id}${ARTIFACT_SUFFIXES[channel]}`);
 }
 
-export async function createArtifactWriter(root: string, id: string): Promise<ArtifactWriter> {
+export async function createArtifactWriter(root: string, id: string, channel: ArtifactChannel = "merged"): Promise<ArtifactWriter> {
   validateRunId(id);
   await ensureStateDirectories(root);
-  const path = artifactPath(root, id);
+  const path = artifactPath(root, id, channel);
   const handle = await open(path, "wx", 0o600);
-  const stream = handle.createWriteStream({ encoding: "utf8" });
+  const stream = handle.createWriteStream();
   let streamError: Error | undefined;
   stream.on("error", (error) => {
     streamError = error;
@@ -88,8 +108,12 @@ export async function createArtifactWriter(root: string, id: string): Promise<Ar
   };
 }
 
-export async function readArtifact(root: string, id: string): Promise<string> {
-  return readFile(artifactPath(root, id), "utf8");
+export async function readArtifact(root: string, id: string, channel: ArtifactChannel = "merged"): Promise<string> {
+  return readFile(artifactPath(root, id, channel), "utf8");
+}
+
+export async function readArtifactBytes(root: string, id: string, channel: ArtifactChannel = "merged"): Promise<Buffer> {
+  return readFile(artifactPath(root, id, channel));
 }
 
 export async function appendMetric(root: string, metric: RunMetric): Promise<void> {
@@ -105,8 +129,39 @@ export async function readMetrics(root: string): Promise<RunMetric[]> {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
     throw error;
   }
-  return raw
-    .split(/\r?\n/u)
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as RunMetric);
+  const metrics: RunMetric[] = [];
+  for (const line of raw.split(/\r?\n/u).filter(Boolean)) {
+    try {
+      const value = JSON.parse(line) as unknown;
+      if (isRunMetric(value)) metrics.push(value);
+    } catch {
+      // A damaged historical record must not make every later metric unreadable.
+    }
+  }
+  return metrics;
+}
+
+function isRunMetric(value: unknown): value is RunMetric {
+  if (typeof value !== "object" || value === null) return false;
+  const metric = value as Partial<RunMetric>;
+  const numeric = [
+    metric.durationMs,
+    metric.rawBytes,
+    metric.rawLines,
+    metric.visibleBytes,
+    metric.visibleLines,
+    metric.omittedLines,
+    metric.estimatedInputTokens,
+    metric.estimatedVisibleTokens
+  ];
+  return (
+    metric.schemaVersion === 1 &&
+    typeof metric.id === "string" &&
+    (metric.kind === "exec" || metric.kind === "gate") &&
+    (metric.preset === "safe" || metric.preset === "lean" || metric.preset === "ultra") &&
+    typeof metric.command === "string" &&
+    (metric.exitCode === null || (typeof metric.exitCode === "number" && Number.isFinite(metric.exitCode))) &&
+    typeof metric.startedAt === "string" &&
+    numeric.every((item) => typeof item === "number" && Number.isFinite(item))
+  );
 }

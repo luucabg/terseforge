@@ -31,3 +31,7 @@ Each gate has:
 The executable is not a shell string. Put every argument in `args`. TerseForge rejects shell metacharacters in `command`, runs with a cross-platform argument-safe process launcher, and never interprets `args` as a concatenated shell expression.
 
 Required non-zero results make `terseforge check` exit non-zero. Optional failures are still shown and stored.
+
+`terseforge init` reads the current `package.json` and configures only existing `typecheck`, `lint`, `test`, and `build` scripts. It does not generate `--if-present` gates. A known package-manager gate whose script is missing is recorded as `not_configured`, never `passed`. An empty `qualityGates` array also makes `terseforge check` exit non-zero.
+
+Gate metrics retain the original gate name, required/optional condition, status, and check identifier. Older schema-v1 JSONL records remain readable, but handoffs ignore legacy records that cannot be assigned safely to one complete check.

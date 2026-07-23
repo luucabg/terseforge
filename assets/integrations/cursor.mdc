@@ -3,6 +3,7 @@ description: Conservative TerseForge workflow
 alwaysApply: true
 ---
 
-Use TerseForge only to reduce irrelevant context, noisy logs, and visible narration. Default to `safe`. Prefer `terseforge map`, targeted `terseforge context`, and `terseforge exec -- ...`. Recover exact raw output with `terseforge output <run-id>`. Never compress code, diffs, paths, commands, errors, warnings, or security findings. Run `terseforge check` before claiming success; required failures block verification.
+<!-- terseforge:managed-instructions -->
+Use TerseForge only to reduce irrelevant context, noisy logs, and visible narration. Default to `safe`. Prefer `terseforge map`, targeted `terseforge context`, and `terseforge exec -- ...`. Recover stored output with `terseforge output <run-id>`. Never compress code, diffs, paths, commands, errors, warnings, or security findings. Run `terseforge check` before claiming success; required failures block verification.
 
 Compatibility is instructions-only; automatic tool interception is not claimed.

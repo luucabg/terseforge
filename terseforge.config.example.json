@@ -13,28 +13,28 @@
     {
       "name": "typecheck",
       "command": "npm",
-      "args": ["run", "typecheck", "--if-present"],
+      "args": ["run", "typecheck"],
       "required": true,
       "timeoutMs": 120000
     },
     {
       "name": "lint",
       "command": "npm",
-      "args": ["run", "lint", "--if-present"],
+      "args": ["run", "lint"],
       "required": true,
       "timeoutMs": 120000
     },
     {
       "name": "test",
       "command": "npm",
-      "args": ["test", "--if-present"],
+      "args": ["run", "test"],
       "required": true,
       "timeoutMs": 300000
     },
     {
       "name": "build",
       "command": "npm",
-      "args": ["run", "build", "--if-present"],
+      "args": ["run", "build"],
       "required": true,
       "timeoutMs": 180000
     }

@@ -3,7 +3,7 @@ import { access, copyFile, mkdir, readFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { createDefaultConfig, loadConfig, PRESETS, writeConfig, type Preset } from "./config.js";
+import { createDefaultConfig, loadConfig, PRESETS, writeConfig, type Preset, type TerseForgeConfig } from "./config.js";
 import { ensureStateDirectories, statePath } from "./storage.js";
 
 const execFileAsync = promisify(execFile);
@@ -46,6 +46,40 @@ async function copyIfAbsent(root: string, asset: string, target: string, result:
   result.created.push(target);
 }
 
+async function detectedPackageManager(root: string, packageManager: unknown): Promise<string> {
+  if (typeof packageManager === "string") {
+    const declared = /^(npm|pnpm|yarn|bun)@/u.exec(packageManager)?.[1];
+    if (declared) return declared;
+  }
+  if (await exists(join(root, "pnpm-lock.yaml"))) return "pnpm";
+  if (await exists(join(root, "yarn.lock"))) return "yarn";
+  if ((await exists(join(root, "bun.lock"))) || (await exists(join(root, "bun.lockb")))) return "bun";
+  return "npm";
+}
+
+export async function detectProjectQualityGates(root: string): Promise<TerseForgeConfig["qualityGates"]> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(await readFile(join(root, "package.json"), "utf8")) as unknown;
+  } catch {
+    return [];
+  }
+  if (typeof parsed !== "object" || parsed === null) return [];
+  const record = parsed as { scripts?: unknown; packageManager?: unknown };
+  if (typeof record.scripts !== "object" || record.scripts === null) return [];
+  const scripts = record.scripts as Record<string, unknown>;
+  const command = await detectedPackageManager(root, record.packageManager);
+  const candidates = [
+    { name: "typecheck", timeoutMs: 120_000 },
+    { name: "lint", timeoutMs: 120_000 },
+    { name: "test", timeoutMs: 300_000 },
+    { name: "build", timeoutMs: 180_000 }
+  ];
+  return candidates
+    .filter(({ name }) => typeof scripts[name] === "string" && scripts[name].trim().length > 0)
+    .map(({ name, timeoutMs }) => ({ name, command, args: ["run", name], required: true, timeoutMs }));
+}
+
 export async function initializeProject(
   root: string,
   options: { preset?: Preset; install?: string[]; force?: boolean } = {}
@@ -63,7 +97,7 @@ export async function initializeProject(
   if ((await exists(configPath)) && !options.force) {
     result.skipped.push("terseforge.config.json");
   } else {
-    await writeConfig(root, { ...createDefaultConfig(), preset });
+    await writeConfig(root, { ...createDefaultConfig(), preset, qualityGates: await detectProjectQualityGates(root) });
     result.created.push("terseforge.config.json");
   }
 
@@ -107,6 +141,23 @@ async function commandVersion(command: string): Promise<string | undefined> {
   }
 }
 
+async function containsManagedInstructions(path: string): Promise<boolean> {
+  try {
+    const content = await readFile(path, "utf8");
+    return /<!--\s*terseforge:managed-instructions\s*-->/iu.test(content) || /^#{1,3}\s+TerseForge\b/mu.test(content);
+  } catch {
+    return false;
+  }
+}
+
+async function containsTerseForgeSkill(path: string): Promise<boolean> {
+  try {
+    return /^name:\s*terseforge\s*$/mu.test(await readFile(path, "utf8"));
+  } catch {
+    return false;
+  }
+}
+
 export async function diagnoseProject(root: string): Promise<DoctorReport> {
   const major = Number(process.versions.node.split(".")[0]);
   const checks: DoctorCheck[] = [
@@ -125,28 +176,34 @@ export async function diagnoseProject(root: string): Promise<DoctorReport> {
     {
       name: "Claude Code",
       level: "native-limited",
-      installed: (await exists(join(root, "CLAUDE.md"))) || (await exists(join(root, ".claude", "skills", "terseforge", "SKILL.md"))),
+      installed:
+        (await containsManagedInstructions(join(root, "CLAUDE.md"))) ||
+        (await containsTerseForgeSkill(join(root, ".claude", "skills", "terseforge", "SKILL.md"))),
       detail: "native project skill or instruction asset plus explicit CLI; automatic interception is not claimed"
     },
     {
       name: "Codex",
       level: "native-limited",
-      installed: (await exists(join(root, "AGENTS.md"))) || (await exists(join(root, ".agents", "skills", "terseforge", "SKILL.md"))),
+      installed:
+        (await containsManagedInstructions(join(root, "AGENTS.md"))) ||
+        (await containsTerseForgeSkill(join(root, ".agents", "skills", "terseforge", "SKILL.md"))),
       detail: "native project skill or AGENTS.md plus explicit CLI; automatic interception is not claimed"
     },
     {
       name: "Gemini CLI",
       level: "native-limited",
-      installed: (await exists(join(root, "GEMINI.md"))) || (await exists(join(root, ".gemini", "skills", "terseforge", "SKILL.md"))),
+      installed:
+        (await containsManagedInstructions(join(root, "GEMINI.md"))) ||
+        (await containsTerseForgeSkill(join(root, ".gemini", "skills", "terseforge", "SKILL.md"))),
       detail: "native project skill or GEMINI.md plus explicit CLI; automatic interception is not claimed"
     },
     {
       name: "Cursor / Windsurf / Cline",
       level: "instructions-only",
       installed:
-        (await exists(join(root, ".cursor", "rules", "terseforge.mdc"))) ||
-        (await exists(join(root, ".windsurf", "rules", "terseforge.md"))) ||
-        (await exists(join(root, ".clinerules", "terseforge.md"))),
+        (await containsManagedInstructions(join(root, ".cursor", "rules", "terseforge.mdc"))) ||
+        (await containsManagedInstructions(join(root, ".windsurf", "rules", "terseforge.md"))) ||
+        (await containsManagedInstructions(join(root, ".clinerules", "terseforge.md"))),
       detail: "rule files only"
     }
   ];

@@ -44,5 +44,10 @@ describe("configuration", () => {
     const malformed = await mkdtemp(join(tmpdir(), "terseforge-config-malformed-"));
     await writeFile(join(malformed, "terseforge.config.json"), "{not-json", "utf8");
     await expect(loadConfig(malformed)).rejects.toThrow(/invalid json/iu);
+
+    const invalid = await mkdtemp(join(tmpdir(), "terseforge-config-invalid-shape-"));
+    await writeFile(join(invalid, "terseforge.config.json"), JSON.stringify({ schemaVersion: 1 }), "utf8");
+    await expect(loadConfig(invalid)).rejects.toThrow(/invalid terseforge configuration/iu);
+    await expect(writeConfig(invalid, null)).rejects.toThrow(/configuration/iu);
   });
 });

@@ -20,6 +20,7 @@ const POLICIES: Record<Preset, { head: number; tail: number; deduplicateDiagnost
 };
 
 const DIAGNOSTIC_PATTERN = /(?:\berror\b|\bwarn(?:ing)?\b|\bfail(?:ed|ure)?\b|\bfatal\b|\bexception\b|\bpanic\b|\bERR_[A-Z_]+\b|\bTS\d{4}\b|\bnot ok\b|\bassert(?:ion)?\b)/iu;
+const DIAGNOSTIC_CONTEXT_LINES = 3;
 
 export class StreamingPruner {
   readonly #policy: (typeof POLICIES)[Preset];
@@ -27,8 +28,10 @@ export class StreamingPruner {
   readonly #tail: IndexedLine[] = [];
   readonly #diagnostics: IndexedLine[] = [];
   readonly #diagnosticCounts = new Map<string, { first: IndexedLine; count: number }>();
+  readonly #recent: IndexedLine[] = [];
   #pending = "";
   #lineCount = 0;
+  #diagnosticLinesRemaining = 0;
 
   constructor(preset: Preset) {
     this.#policy = POLICIES[preset];
@@ -85,17 +88,28 @@ export class StreamingPruner {
     this.#tail.push(entry);
     if (this.#tail.length > this.#policy.tail) this.#tail.shift();
 
-    if (!DIAGNOSTIC_PATTERN.test(text)) return;
-    if (!this.#policy.deduplicateDiagnostics) {
+    if (DIAGNOSTIC_PATTERN.test(text)) {
+      if (!this.#policy.deduplicateDiagnostics) {
+        this.#diagnostics.push(...this.#recent, entry);
+        this.#diagnosticLinesRemaining = DIAGNOSTIC_CONTEXT_LINES;
+      } else {
+        const existing = this.#diagnosticCounts.get(text);
+        if (existing) {
+          existing.count += 1;
+          this.#diagnosticLinesRemaining = 0;
+        } else {
+          this.#diagnostics.push(...this.#recent);
+          this.#diagnosticCounts.set(text, { first: entry, count: 1 });
+          this.#diagnosticLinesRemaining = DIAGNOSTIC_CONTEXT_LINES;
+        }
+      }
+    } else if (this.#diagnosticLinesRemaining > 0) {
       this.#diagnostics.push(entry);
-      return;
+      this.#diagnosticLinesRemaining -= 1;
     }
-    const existing = this.#diagnosticCounts.get(text);
-    if (existing) {
-      existing.count += 1;
-    } else {
-      this.#diagnosticCounts.set(text, { first: entry, count: 1 });
-    }
+
+    this.#recent.push(entry);
+    if (this.#recent.length > DIAGNOSTIC_CONTEXT_LINES) this.#recent.shift();
   }
 }
 
