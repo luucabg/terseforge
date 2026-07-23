@@ -45,6 +45,7 @@ describe("progressive TS/JS context", () => {
 
     expect(result.snippets[0]?.path).toBe("src/auth.ts");
     expect(result.text).toContain("3: export function validateToken");
+    expect(result.snippets.some((snippet) => snippet.path === "src/jwt.ts")).toBe(true);
     expect(result.estimatedTokens).toBeLessThanOrEqual(100);
   });
 
@@ -101,6 +102,7 @@ describe("progressive TS/JS context", () => {
     expect(tight.estimatedTokens).toBeLessThanOrEqual(10);
     expect(defaultBudget.snippets[0]?.score).toBeGreaterThan(0);
     expect(formatRepositoryMap({ root, files: [] })).toContain("No supported");
+    expect(() => formatRepositoryMap(map, 0)).toThrow(/positive integer/iu);
   });
 
   it("skips tracked files deleted from the working tree", async () => {

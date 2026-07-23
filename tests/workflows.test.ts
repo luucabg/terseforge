@@ -45,6 +45,31 @@ describe("quality and measurement workflows", () => {
     expect(result.results[1]).toMatchObject({ name: "failing", exitCode: 2, required: true });
   });
 
+  it("reports an optional gate failure without failing the whole check", async () => {
+    const root = await mkdtemp(join(tmpdir(), "terseforge-gates-optional-"));
+    const config: TerseForgeConfig = {
+      schemaVersion: 1,
+      preset: "safe",
+      telemetry: false,
+      context: { budgetTokens: 1_200, maxFileBytes: 200_000 },
+      output: { artifactRetentionDays: 30 },
+      qualityGates: [
+        {
+          name: "advisory",
+          command: process.execPath,
+          args: ["-e", "process.exit(2)"],
+          required: false,
+          timeoutMs: 5_000
+        }
+      ]
+    };
+
+    const result = await runQualityGates(root, config);
+
+    expect(result).toMatchObject({ ok: true, configured: true });
+    expect(result.results[0]).toMatchObject({ name: "advisory", required: false, status: "failed", exitCode: 2 });
+  });
+
   it("never passes when no quality gates are configured", async () => {
     const root = await mkdtemp(join(tmpdir(), "terseforge-gates-empty-"));
     const config: TerseForgeConfig = {
@@ -79,6 +104,22 @@ describe("quality and measurement workflows", () => {
 
     expect(result.ok).toBe(false);
     expect(result.results[0]).toMatchObject({ name: "typecheck", required: true, status: "not_configured", exitCode: null });
+  });
+
+  it("recognizes npm test shorthand as a package-script gate", async () => {
+    const root = await mkdtemp(join(tmpdir(), "terseforge-gates-npm-test-"));
+    const config: TerseForgeConfig = {
+      schemaVersion: 1,
+      preset: "safe",
+      telemetry: false,
+      context: { budgetTokens: 1_200, maxFileBytes: 200_000 },
+      output: { artifactRetentionDays: 30 },
+      qualityGates: [{ name: "test", command: "npm", args: ["test", "--if-present"], required: true, timeoutMs: 5_000 }]
+    };
+
+    const result = await runQualityGates(root, config);
+
+    expect(result.results[0]).toMatchObject({ name: "test", status: "not_configured", exitCode: null });
   });
 
   it("runs a deterministic pruning benchmark with explicit scope", async () => {

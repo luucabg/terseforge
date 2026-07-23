@@ -53,4 +53,8 @@ describe("recoverable output pruning", () => {
     expect(result.text).toContain("at validateToken");
     expect(result.text).toContain("at handleRequest");
   });
+
+  it("handles empty output without inventing visible lines", () => {
+    expect(pruneText("", "safe")).toMatchObject({ text: "", rawLines: 0, visibleLines: 0, omittedLines: 0 });
+  });
 });
