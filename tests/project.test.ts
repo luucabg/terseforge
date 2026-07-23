@@ -6,7 +6,7 @@ import { createCli } from "../src/cli-program.js";
 import { createDefaultConfig, loadConfig, setPreset, writeConfig } from "../src/config.js";
 import { diagnoseProject, initializeProject, readIntegrationAsset } from "../src/project.js";
 import { installSkill } from "../src/skill.js";
-import { selectArtifactLines } from "../src/output.js";
+import { selectArtifactBytes, selectArtifactLines } from "../src/output.js";
 
 describe("project setup and CLI surface", () => {
   it("exposes every documented MVP command", () => {
@@ -34,6 +34,60 @@ describe("project setup and CLI surface", () => {
     expect(await readFile(join(root, "AGENTS.md"), "utf8")).toContain("TerseForge");
     expect(await readFile(join(root, "GEMINI.md"), "utf8")).toContain("Quality gates");
     expect(await readFile(join(root, "terseforge.config.json"), "utf8")).toContain('"preset": "safe"');
+  });
+
+  it("detects existing package scripts instead of creating no-op quality gates", async () => {
+    const root = await mkdtemp(join(tmpdir(), "terseforge-init-gates-"));
+    await writeFile(
+      join(root, "package.json"),
+      JSON.stringify({ scripts: { typecheck: "tsc --noEmit", test: "vitest run", unrelated: "node tools.js" } }),
+      "utf8"
+    );
+
+    await initializeProject(root);
+    const config = await loadConfig(root);
+
+    expect(config.qualityGates.map((gate) => gate.name)).toEqual(["typecheck", "test"]);
+    expect(config.qualityGates.every((gate) => !gate.args.includes("--if-present"))).toBe(true);
+  });
+
+  it("leaves gates explicitly unconfigured when no supported project scripts exist", async () => {
+    const root = await mkdtemp(join(tmpdir(), "terseforge-init-no-gates-"));
+    await writeFile(join(root, "package.json"), JSON.stringify({ scripts: {} }), "utf8");
+
+    await initializeProject(root);
+
+    await expect(loadConfig(root)).resolves.toMatchObject({ qualityGates: [] });
+  });
+
+  it("honors declared and lockfile package managers when detecting gates", async () => {
+    const fixtures = [
+      { manager: "pnpm", packageManager: "pnpm@10.0.0", lockfile: undefined },
+      { manager: "yarn", packageManager: undefined, lockfile: "yarn.lock" },
+      { manager: "bun", packageManager: undefined, lockfile: "bun.lock" }
+    ];
+    for (const fixture of fixtures) {
+      const root = await mkdtemp(join(tmpdir(), `terseforge-init-${fixture.manager}-`));
+      await writeFile(
+        join(root, "package.json"),
+        JSON.stringify({ ...(fixture.packageManager ? { packageManager: fixture.packageManager } : {}), scripts: { test: "node test.js" } }),
+        "utf8"
+      );
+      if (fixture.lockfile) await writeFile(join(root, fixture.lockfile), "", "utf8");
+
+      await initializeProject(root);
+
+      expect((await loadConfig(root)).qualityGates[0]?.command).toBe(fixture.manager);
+    }
+  });
+
+  it("treats malformed package metadata as an explicit no-gate configuration", async () => {
+    const root = await mkdtemp(join(tmpdir(), "terseforge-init-malformed-package-"));
+    await writeFile(join(root, "package.json"), "{invalid", "utf8");
+
+    await initializeProject(root);
+
+    await expect(loadConfig(root)).resolves.toMatchObject({ qualityGates: [] });
   });
 
   it("never overwrites an existing instruction file", async () => {
@@ -78,6 +132,18 @@ describe("project setup and CLI surface", () => {
     expect(report.integrations.every((integration) => ["native-limited", "instructions-only", "experimental"].includes(integration.level))).toBe(true);
   });
 
+  it("does not treat unrelated agent instruction files as TerseForge installations", async () => {
+    const root = await mkdtemp(join(tmpdir(), "terseforge-doctor-foreign-"));
+    await writeConfig(root, createDefaultConfig());
+    await writeFile(join(root, "AGENTS.md"), "# Repository instructions\n\nRun the existing tests.\n", "utf8");
+    await writeFile(join(root, "CLAUDE.md"), "# Claude instructions\n", "utf8");
+    await writeFile(join(root, "GEMINI.md"), "# Gemini instructions\n", "utf8");
+
+    const report = await diagnoseProject(root);
+
+    expect(report.integrations.filter((integration) => integration.name !== "Cursor / Windsurf / Cline").every((integration) => !integration.installed)).toBe(true);
+  });
+
   it("recognizes native project skills for Codex, Claude Code, and Gemini CLI", async () => {
     const root = await mkdtemp(join(tmpdir(), "terseforge-doctor-skills-"));
     await initializeProject(root, { preset: "safe" });
@@ -109,9 +175,19 @@ describe("project setup and CLI surface", () => {
 
   it("selects a validated 1-based inclusive output range", () => {
     expect(selectArtifactLines("one\ntwo\n")).toBe("one\ntwo\n");
-    expect(selectArtifactLines("one\ntwo\nthree\nfour\n", "2:3")).toBe("two\nthree");
+    expect(selectArtifactLines("one\r\ntwo\r\nthree", "2:3")).toBe("two\r\nthree");
+    expect(selectArtifactLines("one\ntwo\nthree\nfour\n", "2:3")).toBe("two\nthree\n");
     expect(() => selectArtifactLines("one\n", "nope")).toThrow(/range/i);
     expect(() => selectArtifactLines("one\n", "0:2")).toThrow(/range/i);
     expect(() => selectArtifactLines("one\n", "3:2")).toThrow(/range/i);
+    expect(selectArtifactLines("one\n", "3:4")).toBe("");
+  });
+
+  it("selects ranges without decoding or replacing non-UTF-8 bytes", () => {
+    const raw = Buffer.from([0xff, 0x0a, 0x61, 0x0d, 0x0a, 0x80]);
+
+    expect(selectArtifactBytes(raw)).toEqual(raw);
+    expect(selectArtifactBytes(raw, "2:3")).toEqual(Buffer.from([0x61, 0x0d, 0x0a, 0x80]));
+    expect(selectArtifactBytes(raw, "4:5")).toEqual(Buffer.alloc(0));
   });
 });

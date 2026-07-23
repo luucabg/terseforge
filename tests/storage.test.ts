@@ -1,8 +1,8 @@
-import { mkdtemp } from "node:fs/promises";
+import { appendFile, mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { appendMetric, createArtifactWriter, readArtifact, readMetrics } from "../src/storage.js";
+import { appendMetric, artifactPath, createArtifactWriter, readArtifact, readArtifactBytes, readMetrics, statePath, type ArtifactChannel } from "../src/storage.js";
 
 describe("local storage", () => {
   it("stores and retrieves complete raw output", async () => {
@@ -13,6 +13,7 @@ describe("local storage", () => {
     await writer.close();
 
     await expect(readArtifact(root, "run-safe_123")).resolves.toBe("first\nsecond\nthird\n");
+    await expect(readArtifactBytes(root, "run-safe_123")).resolves.toEqual(Buffer.from("first\nsecond\nthird\n"));
     await expect(readArtifact(root, "../outside")).rejects.toThrow(/identifier/i);
   });
 
@@ -47,6 +48,31 @@ describe("local storage", () => {
     await expect(readMetrics(root)).resolves.toEqual([]);
   });
 
+  it("keeps valid legacy metrics readable when a historical line is damaged", async () => {
+    const root = await mkdtemp(join(tmpdir(), "terseforge-metrics-damaged-"));
+    const metric = {
+      schemaVersion: 1,
+      id: "legacy",
+      kind: "gate",
+      preset: "safe",
+      command: "npm",
+      exitCode: 0,
+      startedAt: "2026-01-01T00:00:00.000Z",
+      durationMs: 1,
+      rawBytes: 0,
+      rawLines: 0,
+      visibleBytes: 0,
+      visibleLines: 0,
+      omittedLines: 0,
+      estimatedInputTokens: 0,
+      estimatedVisibleTokens: 0
+    };
+    await appendMetric(root, metric as Parameters<typeof appendMetric>[1]);
+    await appendFile(join(statePath(root), "runs.jsonl"), "{damaged\n", "utf8");
+
+    await expect(readMetrics(root)).resolves.toEqual([metric]);
+  });
+
   it("rejects duplicate artifact identifiers instead of overwriting raw logs", async () => {
     const root = await mkdtemp(join(tmpdir(), "terseforge-duplicate-artifact-"));
     const first = await createArtifactWriter(root, "same_id");
@@ -55,5 +81,11 @@ describe("local storage", () => {
 
     await expect(createArtifactWriter(root, "same_id")).rejects.toThrow();
     await expect(readArtifact(root, "same_id")).resolves.toBe("original");
+  });
+
+  it("rejects unsupported artifact channels at the runtime boundary", async () => {
+    const root = await mkdtemp(join(tmpdir(), "terseforge-invalid-channel-"));
+
+    expect(() => artifactPath(root, "run_1", "../escape" as ArtifactChannel)).toThrow(/channel/i);
   });
 });

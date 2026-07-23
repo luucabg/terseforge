@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 import { runBenchmark } from "../src/benchmark.js";
 import { runQualityGates } from "../src/gates.js";
-import { createHandoff, summarizeMetrics } from "../src/workflows.js";
+import { createHandoff, latestCheckFromMetrics, summarizeMetrics } from "../src/workflows.js";
 import type { TerseForgeConfig } from "../src/config.js";
 
 const execFileAsync = promisify(execFile);
@@ -43,6 +43,42 @@ describe("quality and measurement workflows", () => {
     expect(result.ok).toBe(false);
     expect(result.results).toHaveLength(2);
     expect(result.results[1]).toMatchObject({ name: "failing", exitCode: 2, required: true });
+  });
+
+  it("never passes when no quality gates are configured", async () => {
+    const root = await mkdtemp(join(tmpdir(), "terseforge-gates-empty-"));
+    const config: TerseForgeConfig = {
+      schemaVersion: 1,
+      preset: "safe",
+      telemetry: false,
+      context: { budgetTokens: 1_200, maxFileBytes: 200_000 },
+      output: { artifactRetentionDays: 30 },
+      qualityGates: []
+    };
+
+    const result = await runQualityGates(root, config);
+
+    expect(result).toMatchObject({ ok: false, configured: false, results: [] });
+  });
+
+  it("marks a missing package script as not configured even with --if-present", async () => {
+    const root = await mkdtemp(join(tmpdir(), "terseforge-gates-missing-script-"));
+    await writeFile(join(root, "package.json"), JSON.stringify({ scripts: {} }), "utf8");
+    const config: TerseForgeConfig = {
+      schemaVersion: 1,
+      preset: "safe",
+      telemetry: false,
+      context: { budgetTokens: 1_200, maxFileBytes: 200_000 },
+      output: { artifactRetentionDays: 30 },
+      qualityGates: [
+        { name: "typecheck", command: "npm", args: ["run", "typecheck", "--if-present"], required: true, timeoutMs: 5_000 }
+      ]
+    };
+
+    const result = await runQualityGates(root, config);
+
+    expect(result.ok).toBe(false);
+    expect(result.results[0]).toMatchObject({ name: "typecheck", required: true, status: "not_configured", exitCode: null });
   });
 
   it("runs a deterministic pruning benchmark with explicit scope", async () => {
@@ -106,9 +142,9 @@ describe("quality and measurement workflows", () => {
 
     const summary = summarizeMetrics([]);
     const target = await createHandoff(root, "", [
-      { name: "typecheck", required: true, exitCode: 0, output: "", runId: "one" },
-      { name: "lint", required: true, exitCode: 1, output: "", runId: "two" },
-      { name: "advisory", required: false, exitCode: 1, output: "", runId: "three" }
+      { name: "typecheck", required: true, status: "passed", checkId: "check_one", exitCode: 0, output: "", runId: "one" },
+      { name: "lint", required: true, status: "failed", checkId: "check_one", exitCode: 1, output: "", runId: "two" },
+      { name: "advisory", required: false, status: "failed", checkId: "check_one", exitCode: 1, output: "", runId: "three" }
     ]);
     const handoff = await readFile(target, "utf8");
 
@@ -118,6 +154,101 @@ describe("quality and measurement workflows", () => {
     expect(handoff).toContain("typecheck: passed [required]");
     expect(handoff).toContain("lint: failed (1) [required]");
     expect(handoff).toContain("advisory: failed (1)");
+  });
+
+  it("selects only the latest complete check and ignores ambiguous legacy gate metrics", () => {
+    const base = {
+      schemaVersion: 1 as const,
+      kind: "gate" as const,
+      preset: "safe" as const,
+      command: "npm",
+      exitCode: 0,
+      startedAt: "2026-01-01T00:00:00.000Z",
+      durationMs: 1,
+      rawBytes: 0,
+      rawLines: 0,
+      visibleBytes: 0,
+      visibleLines: 0,
+      omittedLines: 0,
+      estimatedInputTokens: 0,
+      estimatedVisibleTokens: 0
+    };
+    const latest = latestCheckFromMetrics([
+      { ...base, id: "legacy" },
+      {
+        ...base,
+        id: "old-test",
+        checkId: "check_old",
+        checkGateIndex: 0,
+        checkGateCount: 1,
+        checkCompleted: true,
+        gateName: "test",
+        gateRequired: true,
+        gateStatus: "passed"
+      },
+      {
+        ...base,
+        id: "new-lint",
+        checkId: "check_new",
+        checkGateIndex: 0,
+        checkGateCount: 2,
+        gateName: "lint",
+        gateRequired: false,
+        gateStatus: "failed",
+        exitCode: 2
+      },
+      {
+        ...base,
+        id: "new-test",
+        checkId: "check_new",
+        checkGateIndex: 1,
+        checkGateCount: 2,
+        checkCompleted: true,
+        gateName: "test",
+        gateRequired: true,
+        gateStatus: "passed"
+      }
+    ]);
+
+    expect(latest?.checkId).toBe("check_new");
+    expect(latest?.results.map((gate) => gate.name)).toEqual(["lint", "test"]);
+    expect(latest?.results[0]).toMatchObject({ required: false, status: "failed", exitCode: 2 });
+  });
+
+  it("rejects incomplete and invalid check groups instead of presenting them as verified", () => {
+    const metric = {
+      schemaVersion: 1 as const,
+      id: "partial",
+      kind: "gate" as const,
+      preset: "safe" as const,
+      command: "npm",
+      exitCode: 0,
+      startedAt: "2026-01-01T00:00:00.000Z",
+      durationMs: 1,
+      rawBytes: 0,
+      rawLines: 0,
+      visibleBytes: 0,
+      visibleLines: 0,
+      omittedLines: 0,
+      estimatedInputTokens: 0,
+      estimatedVisibleTokens: 0,
+      checkId: "check_partial",
+      checkGateIndex: 0,
+      checkGateCount: 2,
+      checkCompleted: true,
+      gateName: "test",
+      gateRequired: true,
+      gateStatus: "passed" as const
+    };
+
+    expect(latestCheckFromMetrics([metric])).toBeUndefined();
+    expect(latestCheckFromMetrics([{ ...metric, gateStatus: "invented" as "passed" }])).toBeUndefined();
+    expect(
+      latestCheckFromMetrics([
+        { ...metric, id: "old", checkId: "check_old", checkGateCount: 1, checkCompleted: true },
+        { ...metric, id: "new", checkId: "check_new", checkCompleted: false }
+      ])
+    ).toBeUndefined();
   });
 
   it("reports visible-output overhead instead of hiding it as zero savings", () => {

@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -80,6 +80,7 @@ describe("progressive TS/JS context", () => {
     const root = await mkdtemp(join(tmpdir(), "terseforge-context-filter-"));
     await writeFile(join(root, ".gitignore"), "ignored.ts\n", "utf8");
     await writeFile(join(root, "tracked.ts"), 'import { thing } from "needle-package";\nexport const trackedNeedle = thing;\n', "utf8");
+    await writeFile(join(root, "untracked.ts"), "export const untrackedNeedle = true;\n", "utf8");
     await writeFile(join(root, "ignored.ts"), "export const ignoredNeedle = true;\n", "utf8");
     await writeFile(join(root, "large.ts"), `export const huge = "${"x".repeat(2_000)}";\n`, "utf8");
     await mkdir(join(root, "dist"));
@@ -95,10 +96,76 @@ describe("progressive TS/JS context", () => {
     const tight = await selectContext(root, { query: "needle", budgetTokens: 10 });
     const defaultBudget = await selectContext(root, { query: "needle" });
 
-    expect(map.files.map((file) => file.path)).toEqual(["tracked.ts"]);
+    expect(map.files.map((file) => file.path)).toEqual(["tracked.ts", "untracked.ts"]);
     expect(noMatch).toMatchObject({ snippets: [], text: "", estimatedTokens: 0 });
     expect(tight.estimatedTokens).toBeLessThanOrEqual(10);
     expect(defaultBudget.snippets[0]?.score).toBeGreaterThan(0);
     expect(formatRepositoryMap({ root, files: [] })).toContain("No supported");
+  });
+
+  it("skips tracked files deleted from the working tree", async () => {
+    const root = await mkdtemp(join(tmpdir(), "terseforge-context-deleted-"));
+    await writeFile(join(root, "deleted.ts"), "export const removed = true;\n", "utf8");
+    await writeFile(join(root, "present.ts"), "export const present = true;\n", "utf8");
+    await execFileAsync("git", ["init"], { cwd: root });
+    await execFileAsync("git", ["add", "deleted.ts", "present.ts"], { cwd: root });
+    await rm(join(root, "deleted.ts"));
+
+    const map = await buildRepositoryMap(root);
+
+    expect(map.files.map((file) => file.path)).toEqual(["present.ts"]);
+  });
+
+  it("keeps the matching line when a snippet must fit a tight budget", async () => {
+    const root = await mkdtemp(join(tmpdir(), "terseforge-context-match-"));
+    await writeFile(
+      join(root, "match.ts"),
+      ["before one", "before two", "before three", "export const targetNeedle = true;", "after one", "after two"].join("\n"),
+      "utf8"
+    );
+
+    const result = await selectContext(root, { query: "target needle", symbol: "targetNeedle", budgetTokens: 14 });
+
+    expect(result.text).toContain("export const targetNeedle");
+    expect(result.estimatedTokens).toBeLessThanOrEqual(14);
+  });
+
+  it("can emit multiple non-overlapping matches from one file", async () => {
+    const root = await mkdtemp(join(tmpdir(), "terseforge-context-multiple-"));
+    await writeFile(
+      join(root, "routes.ts"),
+      [
+        "export const tokenRoute = '/token';",
+        ...Array.from({ length: 12 }, (_, index) => `const filler${index} = ${index};`),
+        "export function validateTokenRoute() { return tokenRoute; }"
+      ].join("\n"),
+      "utf8"
+    );
+
+    const result = await selectContext(root, { query: "token route", budgetTokens: 200 });
+
+    expect(result.snippets.filter((snippet) => snippet.path === "routes.ts")).toHaveLength(2);
+  });
+
+  it("bounds human-readable repository maps while reporting omissions", async () => {
+    const root = await mkdtemp(join(tmpdir(), "terseforge-context-map-limit-"));
+    for (let index = 0; index < 5; index += 1) {
+      await writeFile(join(root, `file-${index}.ts`), `export const value${index} = ${index};\n`, "utf8");
+    }
+    const map = await buildRepositoryMap(root);
+
+    const formatted = formatRepositoryMap(map, 2);
+
+    expect(formatted.split("\n")).toHaveLength(3);
+    expect(formatted).toContain("3 more files omitted");
+  });
+
+  it("matches non-ASCII identifiers and query terms", async () => {
+    const root = await mkdtemp(join(tmpdir(), "terseforge-context-unicode-"));
+    await writeFile(join(root, "saludo.ts"), "export const contraseñaVálida = true;\n", "utf8");
+
+    const result = await selectContext(root, { query: "contraseña válida", budgetTokens: 100 });
+
+    expect(result.text).toContain("contraseñaVálida");
   });
 });

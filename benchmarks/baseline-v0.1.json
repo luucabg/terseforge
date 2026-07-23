@@ -6,24 +6,24 @@
     {
       "preset": "safe",
       "rawBytes": 10865,
-      "visibleBytes": 2631,
-      "reductionPercent": 75.78,
+      "visibleBytes": 2874,
+      "reductionPercent": 73.55,
       "diagnosticsRetained": true,
       "rawRecoverable": true
     },
     {
       "preset": "lean",
       "rawBytes": 10865,
-      "visibleBytes": 1196,
-      "reductionPercent": 88.99,
+      "visibleBytes": 1439,
+      "reductionPercent": 86.76,
       "diagnosticsRetained": true,
       "rawRecoverable": true
     },
     {
       "preset": "ultra",
       "rawBytes": 10865,
-      "visibleBytes": 582,
-      "reductionPercent": 94.64,
+      "visibleBytes": 825,
+      "reductionPercent": 92.41,
       "diagnosticsRetained": true,
       "rawRecoverable": true
     }

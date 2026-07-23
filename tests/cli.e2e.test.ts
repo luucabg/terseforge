@@ -4,16 +4,17 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { createCli } from "../src/cli-program.js";
 import { createDefaultConfig, writeConfig } from "../src/config.js";
+import { createArtifactWriter } from "../src/storage.js";
 
 async function runCli(root: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
   let stdout = "";
   let stderr = "";
   const cli = createCli({
     stdout: (text) => {
-      stdout += text;
+      stdout += typeof text === "string" ? text : Buffer.from(text).toString("utf8");
     },
     stderr: (text) => {
-      stderr += text;
+      stderr += typeof text === "string" ? text : Buffer.from(text).toString("utf8");
     }
   });
   await cli.parseAsync(["--cwd", root, ...args], { from: "user" });
@@ -54,6 +55,7 @@ describe("CLI end-to-end workflow", () => {
     const doctor = await runCli(root, ["doctor"]);
     const map = await runCli(root, ["map"]);
     const jsonMap = await runCli(root, ["map", "--json"]);
+    const boundedJsonMap = await runCli(root, ["map", "--json", "--max-files", "1"]);
     const context = await runCli(root, ["context", "token", "validation", "--symbol", "validateToken", "--budget", "200"]);
     const executed = await runCli(root, ["exec", process.execPath, "-e", "console.log('ok'); console.error('warning: retained')"]);
     const runId = /terseforge output ([a-zA-Z0-9_-]+)/u.exec(executed.stdout)?.[1];
@@ -74,6 +76,7 @@ describe("CLI end-to-end workflow", () => {
     expect(doctor.stdout).toContain("PASS Node.js >=22");
     expect(map.stdout).toContain("validateToken");
     expect(JSON.parse(jsonMap.stdout)).toMatchObject({ files: [expect.objectContaining({ path: "auth.ts" })] });
+    expect(JSON.parse(boundedJsonMap.stdout)).toMatchObject({ totalFiles: 1, omittedFiles: 0 });
     expect(context.stdout).toContain("1: export function validateToken");
     expect(executed.stdout).toContain("warning: retained");
     expect(recovered.stdout).toContain("ok");
@@ -114,5 +117,35 @@ describe("CLI end-to-end workflow", () => {
     const failedCheck = await runCli(root, ["check"]);
     expect(failedCheck.stdout).toContain("failed: 3");
     expect(process.exitCode).toBe(1);
+  });
+
+  it("recovers full artifacts without adding bytes and preserves ranged line endings", async () => {
+    const root = await mkdtemp(join(tmpdir(), "terseforge-cli-output-exact-"));
+    const fullWriter = await createArtifactWriter(root, "without_newline");
+    await fullWriter.write(Buffer.from("alpha"));
+    await fullWriter.close();
+    const rangeWriter = await createArtifactWriter(root, "with_crlf");
+    await rangeWriter.write(Buffer.from("one\r\ntwo\r\nthree"));
+    await rangeWriter.close();
+
+    const full = await runCli(root, ["output", "without_newline"]);
+    const range = await runCli(root, ["output", "with_crlf", "--lines", "2:3"]);
+
+    expect(full.stdout).toBe("alpha");
+    expect(range.stdout).toBe("two\r\nthree");
+  });
+
+  it("fails check visibly when the project has no configured gates", async () => {
+    const root = await mkdtemp(join(tmpdir(), "terseforge-cli-no-gates-"));
+    await writeFile(join(root, "package.json"), JSON.stringify({ scripts: {} }), "utf8");
+    await runCli(root, ["init"]);
+
+    const checked = await runCli(root, ["check"]);
+    await runCli(root, ["handoff", "Verify", "empty", "project"]);
+    const handoff = await readFile(join(root, ".terseforge", "handoff.md"), "utf8");
+
+    expect(checked.stdout).toContain("No quality gates configured");
+    expect(process.exitCode).toBe(1);
+    expect(handoff).toContain("quality-gates: not configured [required]");
   });
 });

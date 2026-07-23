@@ -50,10 +50,10 @@ export function createDefaultConfig(): TerseForgeConfig {
       artifactRetentionDays: 30
     },
     qualityGates: [
-      { name: "typecheck", command: "npm", args: ["run", "typecheck", "--if-present"], required: true, timeoutMs: 120_000 },
-      { name: "lint", command: "npm", args: ["run", "lint", "--if-present"], required: true, timeoutMs: 120_000 },
-      { name: "test", command: "npm", args: ["test", "--if-present"], required: true, timeoutMs: 300_000 },
-      { name: "build", command: "npm", args: ["run", "build", "--if-present"], required: true, timeoutMs: 180_000 }
+      { name: "typecheck", command: "npm", args: ["run", "typecheck"], required: true, timeoutMs: 120_000 },
+      { name: "lint", command: "npm", args: ["run", "lint"], required: true, timeoutMs: 120_000 },
+      { name: "test", command: "npm", args: ["run", "test"], required: true, timeoutMs: 300_000 },
+      { name: "build", command: "npm", args: ["run", "build"], required: true, timeoutMs: 180_000 }
     ]
   };
 }

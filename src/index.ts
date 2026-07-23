@@ -3,11 +3,12 @@ export { CONFIG_FILE, PRESETS, configSchema, createDefaultConfig, loadConfig, se
 export type { Preset, TerseForgeConfig } from "./config.js";
 export { buildRepositoryMap, formatRepositoryMap, selectContext } from "./context.js";
 export { runQualityGates } from "./gates.js";
-export { selectArtifactLines } from "./output.js";
+export { parseLineRange, selectArtifactBytes, selectArtifactLines } from "./output.js";
 export { diagnoseProject, initializeProject } from "./project.js";
 export { pruneText, StreamingPruner } from "./pruning.js";
 export { runProcess } from "./runner.js";
-export { readArtifact, readMetrics } from "./storage.js";
+export { artifactPath, readArtifact, readArtifactBytes, readMetrics } from "./storage.js";
+export type { ArtifactChannel, RecordedGateStatus, RunMetric } from "./storage.js";
 export { installSkill, inspectSkill, resolveSkillDestination, SKILL_AGENTS, SKILL_SCOPES } from "./skill.js";
 export type { SkillAgent, SkillInspection, SkillInstallOptions, SkillInstallResult, SkillLocationOptions, SkillScope } from "./skill.js";
 export { createHandoff, summarizeMetrics } from "./workflows.js";

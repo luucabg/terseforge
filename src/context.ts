@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { lstat, readFile } from "node:fs/promises";
-import { extname, relative, resolve } from "node:path";
+import { extname, posix, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import fg from "fast-glob";
 import createIgnore from "ignore";
@@ -19,6 +19,7 @@ const DEFAULT_IGNORES = [
   "**/*.min.js",
   "**/*.d.ts"
 ];
+const MAX_SNIPPETS_PER_FILE = 3;
 
 export interface SymbolSummary {
   name: string;
@@ -51,14 +52,23 @@ export interface ContextResult {
   estimatedTokens: number;
 }
 
+interface LoadedSource {
+  summary: FileSummary;
+  content: string;
+}
+
 function posixPath(value: string): string {
   return value.replaceAll("\\", "/");
 }
 
-async function gitTrackedFiles(root: string): Promise<string[] | undefined> {
+async function gitCandidateFiles(root: string): Promise<string[] | undefined> {
   try {
-    const { stdout } = await execFileAsync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf8", maxBuffer: 10_000_000 });
-    const files = stdout.split("\0").filter(Boolean).map(posixPath);
+    const { stdout } = await execFileAsync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], {
+      cwd: root,
+      encoding: "utf8",
+      maxBuffer: 100_000_000
+    });
+    const files = [...new Set(stdout.split("\0").filter(Boolean).map(posixPath))];
     return files.length > 0 ? files : undefined;
   } catch {
     return undefined;
@@ -76,8 +86,8 @@ async function ignoredMatcher(root: string): Promise<ReturnType<typeof createIgn
 }
 
 async function sourceFiles(root: string): Promise<string[]> {
-  const tracked = await gitTrackedFiles(root);
-  const candidates = tracked ?? (await fg("**/*.{ts,tsx,js,jsx,mjs,cjs}", { cwd: root, onlyFiles: true, dot: false, ignore: DEFAULT_IGNORES }));
+  const gitFiles = await gitCandidateFiles(root);
+  const candidates = gitFiles ?? (await fg("**/*.{ts,tsx,js,jsx,mjs,cjs}", { cwd: root, onlyFiles: true, dot: false, ignore: DEFAULT_IGNORES }));
   const matcher = await ignoredMatcher(root);
   return candidates
     .map(posixPath)
@@ -110,26 +120,36 @@ function symbolFromNode(node: ts.Node, source: ts.SourceFile): SymbolSummary[] {
   return [];
 }
 
-export async function buildRepositoryMap(root: string, maxFileBytes = 200_000): Promise<RepositoryMap> {
-  const files: FileSummary[] = [];
+async function loadSources(root: string, maxFileBytes: number): Promise<LoadedSource[]> {
+  const loaded: LoadedSource[] = [];
   for (const path of await sourceFiles(root)) {
     const absolute = resolve(root, path);
-    const fileInfo = await lstat(absolute);
-    if (fileInfo.isSymbolicLink() || fileInfo.size > maxFileBytes) continue;
-    const content = await readFile(absolute, "utf8");
-    const source = ts.createSourceFile(path, content, ts.ScriptTarget.Latest, true, scriptKind(path));
-    const imports = source.statements.flatMap((statement) => {
-      if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) return [];
-      return [statement.moduleSpecifier.text];
-    });
-    const symbols = source.statements.flatMap((statement) => symbolFromNode(statement, source));
-    files.push({ path, imports, symbols });
+    try {
+      const fileInfo = await lstat(absolute);
+      if (fileInfo.isSymbolicLink() || !fileInfo.isFile() || fileInfo.size > maxFileBytes) continue;
+      const content = await readFile(absolute, "utf8");
+      const source = ts.createSourceFile(path, content, ts.ScriptTarget.Latest, true, scriptKind(path));
+      const imports = source.statements.flatMap((statement) => {
+        if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) return [];
+        return [statement.moduleSpecifier.text];
+      });
+      const symbols = source.statements.flatMap((statement) => symbolFromNode(statement, source));
+      loaded.push({ summary: { path, imports, symbols }, content });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+      throw error;
+    }
   }
-  return { root: resolve(root), files };
+  return loaded;
+}
+
+export async function buildRepositoryMap(root: string, maxFileBytes = 200_000): Promise<RepositoryMap> {
+  const loaded = await loadSources(root, maxFileBytes);
+  return { root: resolve(root), files: loaded.map((file) => file.summary) };
 }
 
 function queryTerms(query: string): string[] {
-  return query.toLowerCase().split(/[^a-z0-9_$-]+/u).filter((term) => term.length > 1);
+  return query.toLowerCase().split(/[^\p{L}\p{N}_$-]+/u).filter((term) => term.length > 1);
 }
 
 function scoreFile(file: FileSummary, content: string, terms: string[], symbol?: string): number {
@@ -150,56 +170,126 @@ function scoreFile(file: FileSummary, content: string, terms: string[], symbol?:
   return score;
 }
 
+function moduleAliases(path: string): string[] {
+  const extension = extname(path);
+  const withoutExtension = extension ? path.slice(0, -extension.length) : path;
+  return withoutExtension.endsWith("/index") ? [withoutExtension, withoutExtension.slice(0, -"/index".length)] : [withoutExtension];
+}
+
+function resolveRelativeImport(fromPath: string, specifier: string, aliases: Map<string, string>): string | undefined {
+  if (!specifier.startsWith(".")) return undefined;
+  const candidate = posix.normalize(posix.join(posix.dirname(posixPath(fromPath)), specifier));
+  const extension = extname(candidate);
+  const withoutExtension = extension ? candidate.slice(0, -extension.length) : candidate;
+  return aliases.get(withoutExtension) ?? aliases.get(`${withoutExtension}/index`);
+}
+
+function expandImportScores(loaded: LoadedSource[], scores: Map<string, number>): void {
+  const aliases = new Map<string, string>();
+  for (const file of loaded) for (const alias of moduleAliases(file.summary.path)) aliases.set(alias, file.summary.path);
+  const initiallyRelevant = new Set([...scores.entries()].filter(([, score]) => score > 0).map(([path]) => path));
+  for (const file of loaded) {
+    for (const specifier of file.summary.imports) {
+      const imported = resolveRelativeImport(file.summary.path, specifier, aliases);
+      if (!imported) continue;
+      if (initiallyRelevant.has(file.summary.path)) scores.set(imported, Math.max(scores.get(imported) ?? 0, 12));
+      if (initiallyRelevant.has(imported)) scores.set(file.summary.path, Math.max(scores.get(file.summary.path) ?? 0, 8));
+    }
+  }
+}
+
+function matchingLines(lines: string[], terms: string[], symbol?: string): number[] {
+  const lowerSymbol = symbol?.toLowerCase();
+  const matches: number[] = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const lower = lines[index]?.toLowerCase() ?? "";
+    if ((lowerSymbol && lower.includes(lowerSymbol)) || terms.some((term) => lower.includes(term))) matches.push(index);
+  }
+  return matches;
+}
+
+function snippetBody(path: string, lines: string[], start: number, end: number): { body: string; tokens: number } {
+  const numbered = lines.slice(start, end).map((line, index) => `${start + index + 1}: ${line}`);
+  const body = `# ${path}\n${numbered.join("\n")}`;
+  return { body, tokens: Math.ceil(Buffer.byteLength(body) / 4) };
+}
+
+function boundedSnippet(path: string, lines: string[], match: number, availableTokens: number): { start: number; end: number; body: string; tokens: number } | undefined {
+  let start = match;
+  let end = match + 1;
+  let current = snippetBody(path, lines, start, end);
+  if (current.tokens > availableTokens) return undefined;
+  for (let distance = 1; distance <= 3; distance += 1) {
+    if (match - distance >= 0) {
+      const expanded = snippetBody(path, lines, match - distance, end);
+      if (expanded.tokens <= availableTokens) {
+        start = match - distance;
+        current = expanded;
+      }
+    }
+    if (match + distance < lines.length) {
+      const expanded = snippetBody(path, lines, start, match + distance + 1);
+      if (expanded.tokens <= availableTokens) {
+        end = match + distance + 1;
+        current = expanded;
+      }
+    }
+  }
+  return { start, end, body: current.body, tokens: current.tokens };
+}
+
 export async function selectContext(
   root: string,
   options: { query: string; symbol?: string; budgetTokens?: number; maxFileBytes?: number }
 ): Promise<ContextResult> {
   const budgetTokens = options.budgetTokens ?? 1_200;
-  const repositoryMap = await buildRepositoryMap(root, options.maxFileBytes);
+  const loaded = await loadSources(root, options.maxFileBytes ?? 200_000);
   const terms = queryTerms(options.query);
-  const ranked: Array<{ file: FileSummary; content: string; score: number }> = [];
-  for (const file of repositoryMap.files) {
-    const content = await readFile(resolve(root, file.path), "utf8");
-    const score = scoreFile(file, content, terms, options.symbol);
-    if (score > 0) ranked.push({ file, content, score });
-  }
-  ranked.sort((left, right) => right.score - left.score || left.file.path.localeCompare(right.file.path));
+  const scores = new Map(loaded.map((file) => [file.summary.path, scoreFile(file.summary, file.content, terms, options.symbol)]));
+  expandImportScores(loaded, scores);
+  const ranked = loaded
+    .map((file) => ({ ...file, score: scores.get(file.summary.path) ?? 0 }))
+    .filter((file) => file.score > 0)
+    .sort((left, right) => right.score - left.score || left.summary.path.localeCompare(right.summary.path));
 
   const snippets: ContextSnippet[] = [];
   let usedTokens = 0;
   for (const candidate of ranked) {
     const lines = candidate.content.split(/\r?\n/u);
-    const needle = options.symbol?.toLowerCase();
-    let match = needle ? lines.findIndex((line) => line.toLowerCase().includes(needle)) : -1;
-    if (match < 0) match = lines.findIndex((line) => terms.some((term) => line.toLowerCase().includes(term)));
-    if (match < 0) match = Math.max(0, (candidate.file.symbols[0]?.line ?? 1) - 1);
-    const start = Math.max(0, match - 3);
-    const end = Math.min(lines.length, match + 4);
-    const numbered = lines.slice(start, end).map((line, index) => `${start + index + 1}: ${line}`);
-    let body = `# ${candidate.file.path}\n${numbered.join("\n")}`;
-    let tokens = Math.ceil(Buffer.byteLength(body) / 4);
-    while (numbered.length > 1 && usedTokens + tokens > budgetTokens) {
-      numbered.pop();
-      body = `# ${candidate.file.path}\n${numbered.join("\n")}`;
-      tokens = Math.ceil(Buffer.byteLength(body) / 4);
+    const matches = matchingLines(lines, terms, options.symbol);
+    if (matches.length === 0) matches.push(Math.max(0, (candidate.summary.symbols[0]?.line ?? 1) - 1));
+    const covered: Array<{ start: number; end: number }> = [];
+    for (const match of matches) {
+      if (covered.some((range) => match >= range.start && match < range.end)) continue;
+      const snippet = boundedSnippet(candidate.summary.path, lines, match, budgetTokens - usedTokens);
+      if (!snippet) continue;
+      snippets.push({
+        path: candidate.summary.path,
+        startLine: snippet.start + 1,
+        endLine: snippet.end,
+        score: candidate.score,
+        text: snippet.body
+      });
+      covered.push({ start: snippet.start, end: snippet.end });
+      usedTokens += snippet.tokens;
+      if (covered.length >= MAX_SNIPPETS_PER_FILE || usedTokens >= budgetTokens) break;
     }
-    if (usedTokens + tokens > budgetTokens) continue;
-    snippets.push({ path: candidate.file.path, startLine: start + 1, endLine: start + numbered.length, score: candidate.score, text: body });
-    usedTokens += tokens;
     if (usedTokens >= budgetTokens) break;
   }
   return { snippets, text: snippets.map((snippet) => snippet.text).join("\n\n"), estimatedTokens: usedTokens };
 }
 
-export function formatRepositoryMap(map: RepositoryMap): string {
+export function formatRepositoryMap(map: RepositoryMap, maxFiles = 500): string {
   if (map.files.length === 0) return "No supported TS/JS source files found.";
-  return map.files
-    .map((file) => {
-      const symbols = file.symbols.map((symbol) => `${symbol.kind} ${symbol.name}:${symbol.line}`).join(", ") || "no top-level symbols";
-      const imports = file.imports.length > 0 ? ` imports ${file.imports.join(", ")}` : "";
-      return `${file.path}: ${symbols}${imports}`;
-    })
-    .join("\n");
+  if (!Number.isSafeInteger(maxFiles) || maxFiles < 1) throw new Error("Map file limit must be a positive integer.");
+  const visible = map.files.slice(0, maxFiles).map((file) => {
+    const symbols = file.symbols.map((symbol) => `${symbol.kind} ${symbol.name}:${symbol.line}`).join(", ") || "no top-level symbols";
+    const imports = file.imports.length > 0 ? ` imports ${file.imports.join(", ")}` : "";
+    return `${file.path}: ${symbols}${imports}`;
+  });
+  const omitted = map.files.length - visible.length;
+  if (omitted > 0) visible.push(`... ${omitted} more files omitted. Use terseforge context for targeted retrieval.`);
+  return visible.join("\n");
 }
 
 export function relativeToRoot(root: string, path: string): string {

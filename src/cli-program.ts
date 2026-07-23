@@ -1,24 +1,48 @@
+import { createReadStream } from "node:fs";
 import { resolve } from "node:path";
 import { Argument, Command, Option } from "commander";
 import { runBenchmark } from "./benchmark.js";
 import { loadConfig, PRESETS, setPreset, type Preset } from "./config.js";
 import { buildRepositoryMap, formatRepositoryMap, selectContext } from "./context.js";
-import { runQualityGates, type GateResult } from "./gates.js";
-import { selectArtifactLines } from "./output.js";
+import { runQualityGates } from "./gates.js";
+import { parseLineRange, selectArtifactBytes } from "./output.js";
 import { diagnoseProject, initializeProject } from "./project.js";
 import { runProcess } from "./runner.js";
 import { installSkill, inspectSkill, SKILL_AGENTS, SKILL_SCOPES, type SkillAgent, type SkillScope } from "./skill.js";
-import { readArtifact, readMetrics } from "./storage.js";
-import { createHandoff, summarizeMetrics } from "./workflows.js";
+import { artifactPath, readArtifactBytes, readMetrics, type ArtifactChannel } from "./storage.js";
+import { createHandoff, latestCheckFromMetrics, summarizeMetrics } from "./workflows.js";
 
 interface CliIo {
-  stdout: (text: string) => void;
-  stderr: (text: string) => void;
+  stdout: (data: string | Uint8Array) => void;
+  stderr: (data: string | Uint8Array) => void;
+  streamStdoutFile?: (path: string, range?: string) => Promise<void>;
 }
 
 const defaultIo: CliIo = {
-  stdout: (text) => process.stdout.write(text),
-  stderr: (text) => process.stderr.write(text)
+  stdout: (data) => process.stdout.write(data),
+  stderr: (data) => process.stderr.write(data),
+  async streamStdoutFile(path, range) {
+    const selected = range ? parseLineRange(range) : undefined;
+    let currentLine = 1;
+    for await (const chunk of createReadStream(path)) {
+      const data = Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk));
+      if (!selected) {
+        process.stdout.write(data);
+        continue;
+      }
+      let segmentStart = 0;
+      for (let index = 0; index < data.length; index += 1) {
+        if (data[index] !== 0x0a) continue;
+        if (currentLine >= selected.start && currentLine <= selected.end) process.stdout.write(data.subarray(segmentStart, index + 1));
+        currentLine += 1;
+        segmentStart = index + 1;
+        if (currentLine > selected.end) return;
+      }
+      if (segmentStart < data.length && currentLine >= selected.start && currentLine <= selected.end) {
+        process.stdout.write(data.subarray(segmentStart));
+      }
+    }
+  }
 };
 
 function line(value: string): string {
@@ -30,7 +54,7 @@ export function createCli(io: CliIo = defaultIo): Command {
   program
     .name("terseforge")
     .description("Big code. Small chatter. Local optimization for AI coding-agent workflows.")
-    .version("0.1.0")
+    .version("0.1.1")
     .option("--cwd <path>", "repository root", process.cwd())
     .configureOutput({ writeOut: io.stdout, writeErr: io.stderr });
   program.enablePositionalOptions();
@@ -118,22 +142,35 @@ export function createCli(io: CliIo = defaultIo): Command {
 
   program
     .command("output")
-    .description("recover exact raw output from a prior run")
+    .description("recover stored output bytes from a prior run")
     .argument("<run-id>", "run identifier")
     .option("--lines <start:end>", "1-based inclusive line range")
-    .action(async (id: string, options: { lines?: string }) => {
-      const raw = await readArtifact(root(), id);
-      io.stdout(line(selectArtifactLines(raw, options.lines)));
+    .addOption(new Option("--stream <stream>", "stored stream to recover").choices(["merged", "stdout", "stderr"]).default("merged"))
+    .action(async (id: string, options: { lines?: string; stream: ArtifactChannel }) => {
+      const path = artifactPath(root(), id, options.stream);
+      if (io.streamStdoutFile) {
+        await io.streamStdoutFile(path, options.lines);
+        return;
+      }
+      const raw = await readArtifactBytes(root(), id, options.stream);
+      io.stdout(selectArtifactBytes(raw, options.lines));
     });
 
   program
     .command("map")
     .description("print a compact TS/JS repository map")
     .option("--json", "emit JSON", false)
-    .action(async (options: { json: boolean }) => {
+    .option("--max-files <count>", "maximum files to print", (value) => Number(value), 500)
+    .action(async (options: { json: boolean; maxFiles: number }) => {
       const config = await loadConfig(root());
       const map = await buildRepositoryMap(root(), config.context.maxFileBytes);
-      io.stdout(line(options.json ? JSON.stringify(map, null, 2) : formatRepositoryMap(map)));
+      if (!Number.isSafeInteger(options.maxFiles) || options.maxFiles < 1) throw new Error("--max-files must be a positive integer.");
+      if (options.json) {
+        const files = map.files.slice(0, options.maxFiles);
+        io.stdout(line(JSON.stringify({ ...map, files, totalFiles: map.files.length, omittedFiles: map.files.length - files.length }, null, 2)));
+      } else {
+        io.stdout(line(formatRepositoryMap(map, options.maxFiles)));
+      }
     });
 
   program
@@ -160,8 +197,17 @@ export function createCli(io: CliIo = defaultIo): Command {
     .action(async () => {
       const config = await loadConfig(root());
       const result = await runQualityGates(root(), config);
+      if (!result.configured) io.stdout(line("No quality gates configured. Add explicit gates to terseforge.config.json."));
       for (const gate of result.results) {
-        io.stdout(line(`## ${gate.name} (${gate.exitCode === 0 ? "passed" : `failed: ${gate.exitCode}`})`));
+        const status =
+          gate.status === "passed"
+            ? "passed"
+            : gate.status === "not_configured"
+              ? "not configured"
+              : gate.status === "timed_out"
+                ? "timed out"
+                : `failed: ${gate.exitCode ?? "unknown"}`;
+        io.stdout(line(`## ${gate.name} (${status})`));
         io.stdout(line(gate.output));
       }
       if (!result.ok) process.exitCode = 1;
@@ -173,11 +219,8 @@ export function createCli(io: CliIo = defaultIo): Command {
     .argument("[objective...]", "current objective", [])
     .action(async (objective: string[]) => {
       const metrics = await readMetrics(root());
-      const gates: GateResult[] = metrics
-        .filter((metric) => metric.kind === "gate")
-        .slice(-20)
-        .map((metric) => ({ name: metric.command, required: true, exitCode: metric.exitCode, output: "", runId: metric.id }));
-      const target = await createHandoff(root(), objective.join(" "), gates);
+      const latestCheck = latestCheckFromMetrics(metrics);
+      const target = await createHandoff(root(), objective.join(" "), latestCheck?.results ?? []);
       io.stdout(line(`Handoff written: ${target}`));
     });
 
