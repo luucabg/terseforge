@@ -22,4 +22,23 @@ describe("public copy", () => {
     expect(files.length).toBeGreaterThan(0);
     expect(violations).toEqual([]);
   });
+
+  it("provides a safe, copyable prompt for agent-assisted installation", async () => {
+    const root = resolve(import.meta.dirname, "..");
+    const repository = "https://github.com/luucabg/terseforge";
+    const [readme, guide, llms] = await Promise.all([
+      readFile(resolve(root, "README.md"), "utf8"),
+      readFile(resolve(root, "docs", "skills.md"), "utf8"),
+      readFile(resolve(root, "llms.txt"), "utf8")
+    ]);
+
+    expect(readme).toContain(`[luucabg/terseforge](${repository})`);
+    for (const text of [readme, guide]) {
+      expect(text).toContain(`Install TerseForge from ${repository}`);
+      expect(text).toContain("Install both the local CLI and the user-scoped Agent Skill");
+      expect(text).toContain("Do not publish anything");
+      expect(text).toContain("Activate TerseForge in this project.");
+    }
+    expect(llms).toContain(`Agent-assisted installation source: ${repository}`);
+  });
 });

@@ -18,6 +18,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Added
 
+- Copyable agent-assisted installation prompt with the canonical repository, safe boundaries, and verification commands.
 - Portable TerseForge Agent Skill with natural-language activation for Codex, Claude Code, and Gemini CLI.
 - Safe, idempotent `skill install` and `skill status` commands for user and project discovery paths.
 - `mode` command for changing presets without resetting other project configuration.

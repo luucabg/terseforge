@@ -8,7 +8,23 @@ Activate TerseForge in this project.
 
 The agent still uses the local TerseForge CLI. No remote service is involved, and the quality checks remain in place.
 
-## Install once
+## Ask your coding agent to install it
+
+TerseForge is an Agent Skill plus a local CLI. It is not a universal plugin. To install it from [luucabg/terseforge](https://github.com/luucabg/terseforge), paste this into Codex, Claude Code, or Gemini CLI:
+
+```text
+Install TerseForge from https://github.com/luucabg/terseforge for the coding agent I am using.
+Follow the repository's source installation instructions.
+Install both the local CLI and the user-scoped Agent Skill for the current agent.
+Make `terseforge` available in future terminal sessions.
+Preserve existing configuration and agent files.
+Do not publish anything or activate TerseForge in the current project yet.
+Verify the installation with `terseforge --version` and `terseforge skill status --agent <current-agent> --scope user`.
+```
+
+The prompt authorizes installation only. It leaves the current project unchanged until you ask the agent to activate TerseForge.
+
+## Install it yourself
 
 Run the command that matches your coding agent:
 
