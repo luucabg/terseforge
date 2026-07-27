@@ -1,8 +1,9 @@
 import { randomBytes } from "node:crypto";
 import { once } from "node:events";
-import { appendFile, mkdir, open, readFile } from "node:fs/promises";
+import { appendFile, lstat, mkdir, open, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Preset } from "./config.js";
+import type { PruningAdapter } from "./pruning-adapters.js";
 
 export type RunKind = "exec" | "gate";
 export type ArtifactChannel = "merged" | "stdout" | "stderr" | "events";
@@ -27,6 +28,7 @@ export interface RunMetric {
   timedOut?: boolean;
   forcedTermination?: boolean;
   terminationFailed?: boolean;
+  pruningAdapter?: PruningAdapter;
   stdoutBytes?: number;
   stderrBytes?: number;
   checkId?: string;
@@ -60,12 +62,32 @@ export function statePath(root: string): string {
   return join(root, ".terseforge");
 }
 
+async function assertDirectoryNotLinked(path: string, label: string): Promise<void> {
+  const info = await lstat(path);
+  if (info.isSymbolicLink()) throw new Error(`Refusing to use ${label} because it is a symbolic link: ${path}`);
+  if (!info.isDirectory()) throw new Error(`Expected ${label} to be a directory: ${path}`);
+}
+
+export async function assertStateDirectorySafe(root: string): Promise<boolean> {
+  const path = statePath(root);
+  try {
+    await assertDirectoryNotLinked(path, ".terseforge");
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+    throw error;
+  }
+}
+
 export async function ensureStateDirectories(root: string): Promise<void> {
-  await Promise.all([
-    mkdir(join(statePath(root), "artifacts"), { recursive: true }),
-    mkdir(join(statePath(root), "benchmarks"), { recursive: true }),
-    mkdir(join(statePath(root), "integrations"), { recursive: true })
-  ]);
+  const directory = statePath(root);
+  await mkdir(directory, { recursive: true });
+  await assertDirectoryNotLinked(directory, ".terseforge");
+  for (const name of ["artifacts", "benchmarks", "cache", "integrations"] as const) {
+    const child = join(directory, name);
+    await mkdir(child, { recursive: true });
+    await assertDirectoryNotLinked(child, `.terseforge/${name}`);
+  }
 }
 
 function validateRunId(id: string): void {
@@ -141,7 +163,7 @@ export async function readMetrics(root: string): Promise<RunMetric[]> {
   return metrics;
 }
 
-function isRunMetric(value: unknown): value is RunMetric {
+export function isRunMetric(value: unknown): value is RunMetric {
   if (typeof value !== "object" || value === null) return false;
   const metric = value as Partial<RunMetric>;
   const numeric = [

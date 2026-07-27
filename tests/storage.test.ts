@@ -1,4 +1,4 @@
-import { appendFile, mkdtemp } from "node:fs/promises";
+import { appendFile, mkdir, mkdtemp, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -87,5 +87,14 @@ describe("local storage", () => {
     const root = await mkdtemp(join(tmpdir(), "terseforge-invalid-channel-"));
 
     expect(() => artifactPath(root, "run_1", "../escape" as ArtifactChannel)).toThrow(/channel/i);
+  });
+
+  it("refuses linked state roots before writing artifacts", async () => {
+    const root = await mkdtemp(join(tmpdir(), "terseforge-linked-storage-root-"));
+    const outside = await mkdtemp(join(tmpdir(), "terseforge-linked-storage-target-"));
+    await mkdir(join(outside, "artifacts"), { recursive: true });
+    await symlink(outside, statePath(root), process.platform === "win32" ? "junction" : "dir");
+
+    await expect(createArtifactWriter(root, "linked_run")).rejects.toThrow(/symbolic link/iu);
   });
 });

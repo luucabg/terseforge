@@ -67,6 +67,7 @@ describe("CLI end-to-end workflow", () => {
     const statsJson = await runCli(root, ["stats", "--json"]);
     const bench = await runCli(root, ["bench"]);
     const benchJson = await runCli(root, ["bench", "--json"]);
+    const cleanPreview = await runCli(root, ["clean", "--dry-run"]);
     const handoff = await runCli(root, ["handoff", "Ship", "fixture"]);
 
     expect(initialized.stdout).toContain("terseforge.config.json");
@@ -85,6 +86,7 @@ describe("CLI end-to-end workflow", () => {
     expect(JSON.parse(statsJson.stdout)).toMatchObject({ failedRuns: 0 });
     expect(bench.stdout).toContain("tool-output-pruning-only");
     expect(JSON.parse(benchJson.stdout)).toMatchObject({ scope: "tool-output-pruning-only" });
+    expect(cleanPreview.stdout).toContain("Dry run:");
     expect(handoff.stdout).toContain("Handoff written:");
     await expect(readFile(join(root, ".terseforge", "handoff.md"), "utf8")).resolves.toContain("Ship fixture");
     expect(process.exitCode).toBeUndefined();
@@ -94,6 +96,7 @@ describe("CLI end-to-end workflow", () => {
     const root = await mkdtemp(join(tmpdir(), "terseforge-cli-failure-"));
     const missingDoctor = await runCli(root, ["doctor"]);
     expect(missingDoctor.stdout).toContain("FAIL Configuration");
+    expect(missingDoctor.stdout).toContain("WARN Local state ignored by Git");
     expect(process.exitCode).toBe(1);
     process.exitCode = undefined;
 

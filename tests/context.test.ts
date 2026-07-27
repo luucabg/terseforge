@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { promisify } from "node:util";
-import { buildRepositoryMap, formatRepositoryMap, relativeToRoot, selectContext } from "../src/context.js";
+import { buildRepositoryMap, contextIndexPath, formatRepositoryMap, relativeToRoot, selectContext } from "../src/context.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -37,6 +37,65 @@ describe("progressive TS/JS context", () => {
     expect(map.files[0]?.symbols.map((symbol) => symbol.name)).toEqual(
       expect.arrayContaining(["Session", "validateToken"])
     );
+    expect(map.index).toMatchObject({ discoveredFiles: 2, parsedFiles: 2, reusedFiles: 0, deletedFiles: 0 });
+  });
+
+  it("reuses unchanged index entries, reparses changes, and drops deleted files", async () => {
+    const root = await createFixture();
+
+    const first = await buildRepositoryMap(root);
+    const second = await buildRepositoryMap(root);
+    await writeFile(join(root, "src", "auth.ts"), "export const changedNeedle = true;\n", "utf8");
+    const changed = await buildRepositoryMap(root);
+    await rm(join(root, "src", "jwt.ts"));
+    const deleted = await buildRepositoryMap(root);
+
+    expect(first.index).toMatchObject({ parsedFiles: 2, reusedFiles: 0 });
+    expect(second.index).toMatchObject({ parsedFiles: 0, reusedFiles: 2 });
+    expect(changed.index).toMatchObject({ parsedFiles: 1, reusedFiles: 1 });
+    expect(deleted.index).toMatchObject({ parsedFiles: 0, reusedFiles: 1, deletedFiles: 1 });
+    expect(deleted.files.map((file) => file.path)).toEqual(["src/auth.ts"]);
+  });
+
+  it("rebuilds a corrupt local index without losing context", async () => {
+    const root = await createFixture();
+    await buildRepositoryMap(root);
+    await writeFile(contextIndexPath(root), "{broken", "utf8");
+
+    const rebuilt = await buildRepositoryMap(root);
+
+    expect(rebuilt.index).toMatchObject({ parsedFiles: 2, reusedFiles: 0 });
+    expect(rebuilt.files).toHaveLength(2);
+  });
+
+  it("discovers re-exports, dynamic imports, require calls, and tsconfig path aliases", async () => {
+    const root = await mkdtemp(join(tmpdir(), "terseforge-context-imports-"));
+    await mkdir(join(root, "src", "core"), { recursive: true });
+    await writeFile(
+      join(root, "tsconfig.json"),
+      JSON.stringify({ compilerOptions: { baseUrl: ".", paths: { "@core/*": ["src/core/*"] } } }),
+      "utf8"
+    );
+    await writeFile(join(root, "src", "core", "token.ts"), "export const tokenPolicy = 'strict';\n", "utf8");
+    await writeFile(join(root, "src", "lazy.ts"), "export const lazyValue = true;\n", "utf8");
+    await writeFile(join(root, "src", "legacy.cjs"), "module.exports = { legacyValue: true };\n", "utf8");
+    await writeFile(
+      join(root, "src", "entry.ts"),
+      [
+        'export { tokenPolicy } from "@core/token";',
+        'export const loadLazy = () => import("./lazy.js");',
+        'export const legacy = require("./legacy.cjs");',
+        "export function requestHandler() { return true; }"
+      ].join("\n"),
+      "utf8"
+    );
+
+    const map = await buildRepositoryMap(root);
+    const entry = map.files.find((file) => file.path === "src/entry.ts");
+    const context = await selectContext(root, { query: "request handler", budgetTokens: 300 });
+
+    expect(entry?.imports).toEqual(expect.arrayContaining(["@core/token", "./lazy.js", "./legacy.cjs"]));
+    expect(context.snippets.map((snippet) => snippet.path)).toEqual(expect.arrayContaining(["src/entry.ts", "src/core/token.ts"]));
   });
 
   it("ranks symbol matches and emits bounded numbered snippets", async () => {

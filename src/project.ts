@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { createDefaultConfig, loadConfig, PRESETS, writeConfig, type Preset, type TerseForgeConfig } from "./config.js";
 import { ensureStateDirectories, statePath } from "./storage.js";
+import { ensureStateIgnored, isStateIgnored } from "./state-safety.js";
 
 const execFileAsync = promisify(execFile);
 const ASSET_ROOT = fileURLToPath(new URL("../assets/integrations/", import.meta.url));
@@ -23,6 +24,7 @@ export type InstallTarget = keyof typeof INSTALL_TARGETS;
 
 export interface InitializeResult {
   created: string[];
+  updated: string[];
   skipped: string[];
 }
 
@@ -91,8 +93,12 @@ export async function initializeProject(
     if (!Object.hasOwn(INSTALL_TARGETS, name)) throw new Error(`Unknown integration: ${name}`);
   }
 
-  const result: InitializeResult = { created: [], skipped: [] };
+  const result: InitializeResult = { created: [], updated: [], skipped: [] };
   await ensureStateDirectories(root);
+  const ignoreStatus = await ensureStateIgnored(root);
+  if (ignoreStatus === "present") result.skipped.push(".gitignore");
+  else if (ignoreStatus === "created") result.created.push(".gitignore");
+  else result.updated.push(".gitignore");
   const configPath = join(root, "terseforge.config.json");
   if ((await exists(configPath)) && !options.force) {
     result.skipped.push("terseforge.config.json");
@@ -171,6 +177,13 @@ export async function diagnoseProject(root: string): Promise<DoctorReport> {
   } catch (error) {
     checks.push({ name: "Configuration", ok: false, required: true, detail: (error as Error).message });
   }
+  const stateIgnored = await isStateIgnored(root);
+  checks.push({
+    name: "Local state ignored by Git",
+    ok: stateIgnored,
+    required: false,
+    detail: stateIgnored ? "/.terseforge/ is covered by .gitignore" : "add /.terseforge/ to .gitignore before storing command output"
+  });
 
   const integrations: IntegrationStatus[] = [
     {

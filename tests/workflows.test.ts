@@ -125,14 +125,20 @@ describe("quality and measurement workflows", () => {
   it("runs a deterministic pruning benchmark with explicit scope", async () => {
     const root = await mkdtemp(join(tmpdir(), "terseforge-bench-"));
     const result = await runBenchmark(root);
-    const baseline = JSON.parse(await readFile(join(process.cwd(), "benchmarks", "baseline-v0.1.json"), "utf8")) as {
+    const baseline = JSON.parse(await readFile(join(process.cwd(), "benchmarks", "baseline-v0.2.json"), "utf8")) as {
       conditions: typeof result.conditions;
     };
 
     expect(result.scope).toBe("tool-output-pruning-only");
+    expect(result.fixture).toBe("diagnostic-corpus-v2");
+    expect(result.fixtureCount).toBeGreaterThanOrEqual(5);
+    expect(result.fixtures.map((fixture) => fixture.adapter)).toEqual(
+      expect.arrayContaining(["generic", "typescript", "eslint", "vitest", "jest"])
+    );
     expect(result.conditions.map((condition) => condition.preset)).toEqual(["safe", "lean", "ultra"]);
     expect(result.conditions.every((condition) => condition.diagnosticsRetained)).toBe(true);
     expect(result.conditions.every((condition) => condition.rawRecoverable)).toBe(true);
+    expect(result.fixtures.every((fixture) => fixture.conditions.every((condition) => condition.diagnosticsRetained))).toBe(true);
     expect(result.conditions).toEqual(baseline.conditions);
   });
 

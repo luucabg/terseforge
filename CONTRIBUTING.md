@@ -22,7 +22,7 @@ Use Node 22 or 24. Keep the project serverless and local-only unless a future pr
 5. Run `npm run check` after the final edit.
 6. Update documentation and `CHANGELOG.md` for user-visible changes.
 
-Coverage thresholds are 80% globally for statements, branches, functions, and lines. Tests currently include unit, integration, CLI end-to-end, Windows command-wrapper, timeout, path-validation, and benchmark recovery cases.
+Coverage thresholds are 80% globally for statements, branches, functions, and lines. Tests currently include unit, integration, CLI end-to-end, Windows command-wrapper, timeout, path-validation, context-index invalidation, cleanup-boundary, adapter, and benchmark recovery cases.
 
 ## Design constraints
 
@@ -33,6 +33,8 @@ Coverage thresholds are 80% globally for statements, branches, functions, and li
 - No quality reduction in exchange for fewer tokens.
 - Configuration changes must remain schema-versioned and migration-aware.
 - Commands use executable/argument arrays, not concatenated shell text.
+- Local cleanup must remain bounded to owned state paths and must not follow directory symlinks.
+- Persistent indexes must recover safely from stale, missing, or damaged entries.
 
 ## Pull requests
 

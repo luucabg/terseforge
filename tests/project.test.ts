@@ -12,7 +12,7 @@ describe("project setup and CLI surface", () => {
   it("exposes every documented MVP command", () => {
     const names = createCli().commands.map((command) => command.name());
 
-    expect(names).toEqual(["init", "mode", "skill", "doctor", "exec", "output", "map", "context", "check", "handoff", "stats", "bench"]);
+    expect(names).toEqual(["init", "mode", "skill", "doctor", "exec", "output", "map", "context", "check", "handoff", "stats", "clean", "bench"]);
   });
 
   it("changes only the configured preset", async () => {
@@ -34,6 +34,31 @@ describe("project setup and CLI surface", () => {
     expect(await readFile(join(root, "AGENTS.md"), "utf8")).toContain("TerseForge");
     expect(await readFile(join(root, "GEMINI.md"), "utf8")).toContain("Quality gates");
     expect(await readFile(join(root, "terseforge.config.json"), "utf8")).toContain('"preset": "safe"');
+    expect(await readFile(join(root, ".gitignore"), "utf8")).toContain("/.terseforge/");
+  });
+
+  it("adds one state ignore rule while preserving existing line endings and rules", async () => {
+    const root = await mkdtemp(join(tmpdir(), "terseforge-init-ignore-"));
+    await writeFile(join(root, ".gitignore"), "node_modules/\r\n", "utf8");
+
+    const first = await initializeProject(root);
+    const second = await initializeProject(root);
+    const gitignore = await readFile(join(root, ".gitignore"), "utf8");
+
+    expect(first.updated).toContain(".gitignore");
+    expect(second.skipped).toContain(".gitignore");
+    expect(gitignore).toBe("node_modules/\r\n/.terseforge/\r\n");
+    expect(gitignore.match(/\.terseforge/gu)).toHaveLength(1);
+  });
+
+  it("does not duplicate an existing equivalent state ignore", async () => {
+    const root = await mkdtemp(join(tmpdir(), "terseforge-init-ignore-existing-"));
+    await writeFile(join(root, ".gitignore"), ".terseforge/**\n", "utf8");
+
+    const result = await initializeProject(root);
+
+    expect(result.skipped).toContain(".gitignore");
+    await expect(readFile(join(root, ".gitignore"), "utf8")).resolves.toBe(".terseforge/**\n");
   });
 
   it("detects existing package scripts instead of creating no-op quality gates", async () => {
@@ -129,7 +154,20 @@ describe("project setup and CLI surface", () => {
 
     expect(report.ok).toBe(true);
     expect(report.checks).toEqual(expect.arrayContaining([expect.objectContaining({ name: "Node.js >=22", ok: true })]));
+    expect(report.checks).toContainEqual(expect.objectContaining({ name: "Local state ignored by Git", ok: true, required: false }));
     expect(report.integrations.every((integration) => ["native-limited", "instructions-only", "experimental"].includes(integration.level))).toBe(true);
+  });
+
+  it("warns without overstating failure when local state is not ignored", async () => {
+    const root = await mkdtemp(join(tmpdir(), "terseforge-doctor-ignore-"));
+    await writeConfig(root, createDefaultConfig());
+
+    const report = await diagnoseProject(root);
+
+    expect(report.ok).toBe(true);
+    expect(report.checks).toContainEqual(
+      expect.objectContaining({ name: "Local state ignored by Git", ok: false, required: false })
+    );
   });
 
   it("does not treat unrelated agent instruction files as TerseForge installations", async () => {

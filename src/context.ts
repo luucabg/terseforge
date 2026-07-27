@@ -1,41 +1,26 @@
-import { execFile } from "node:child_process";
-import { lstat, readFile } from "node:fs/promises";
-import { extname, posix, relative, resolve } from "node:path";
-import { promisify } from "node:util";
-import fg from "fast-glob";
-import createIgnore from "ignore";
-import ts from "typescript";
+import { readFile } from "node:fs/promises";
+import { relative, resolve } from "node:path";
+import {
+  compilerOptionsForRoot,
+  loadContextIndex,
+  moduleAliases,
+  posixPath,
+  resolveIndexedImport,
+  tokenizeContextSearch,
+  type ContextIndexStats,
+  type FileSummary,
+  type IndexedSource
+} from "./context-index.js";
 
-const execFileAsync = promisify(execFile);
-const SUPPORTED_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
-const GENERATED_SEGMENTS = new Set(["node_modules", "dist", "build", "coverage", ".git", ".terseforge"]);
-const DEFAULT_IGNORES = [
-  "**/node_modules/**",
-  "**/dist/**",
-  "**/build/**",
-  "**/coverage/**",
-  "**/.git/**",
-  "**/.terseforge/**",
-  "**/*.min.js",
-  "**/*.d.ts"
-];
 const MAX_SNIPPETS_PER_FILE = 3;
 
-export interface SymbolSummary {
-  name: string;
-  kind: string;
-  line: number;
-}
-
-export interface FileSummary {
-  path: string;
-  imports: string[];
-  symbols: SymbolSummary[];
-}
+export type { ContextIndexStats, FileSummary, SymbolSummary } from "./context-index.js";
+export { contextIndexPath } from "./context-index.js";
 
 export interface RepositoryMap {
   root: string;
   files: FileSummary[];
+  index?: ContextIndexStats;
 }
 
 export interface ContextSnippet {
@@ -50,147 +35,40 @@ export interface ContextResult {
   snippets: ContextSnippet[];
   text: string;
   estimatedTokens: number;
-}
-
-interface LoadedSource {
-  summary: FileSummary;
-  content: string;
-}
-
-function posixPath(value: string): string {
-  return value.replaceAll("\\", "/");
-}
-
-async function gitCandidateFiles(root: string): Promise<string[] | undefined> {
-  try {
-    const { stdout } = await execFileAsync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], {
-      cwd: root,
-      encoding: "utf8",
-      maxBuffer: 100_000_000
-    });
-    const files = [...new Set(stdout.split("\0").filter(Boolean).map(posixPath))];
-    return files.length > 0 ? files : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-async function ignoredMatcher(root: string): Promise<ReturnType<typeof createIgnore>> {
-  const matcher = createIgnore();
-  try {
-    matcher.add(await readFile(resolve(root, ".gitignore"), "utf8"));
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-  }
-  return matcher;
-}
-
-async function sourceFiles(root: string): Promise<string[]> {
-  const gitFiles = await gitCandidateFiles(root);
-  const candidates = gitFiles ?? (await fg("**/*.{ts,tsx,js,jsx,mjs,cjs}", { cwd: root, onlyFiles: true, dot: false, ignore: DEFAULT_IGNORES }));
-  const matcher = await ignoredMatcher(root);
-  return candidates
-    .map(posixPath)
-    .filter((path) => SUPPORTED_EXTENSIONS.has(extname(path).toLowerCase()))
-    .filter((path) => !path.split("/").some((segment) => GENERATED_SEGMENTS.has(segment)))
-    .filter((path) => !matcher.ignores(path))
-    .filter((path) => !path.endsWith(".d.ts") && !path.endsWith(".min.js"))
-    .sort((left, right) => left.localeCompare(right));
-}
-
-function scriptKind(path: string): ts.ScriptKind {
-  if (path.endsWith(".tsx")) return ts.ScriptKind.TSX;
-  if (path.endsWith(".jsx")) return ts.ScriptKind.JSX;
-  if (path.endsWith(".js") || path.endsWith(".mjs") || path.endsWith(".cjs")) return ts.ScriptKind.JS;
-  return ts.ScriptKind.TS;
-}
-
-function symbolFromNode(node: ts.Node, source: ts.SourceFile): SymbolSummary[] {
-  const line = source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
-  if (ts.isFunctionDeclaration(node) && node.name) return [{ name: node.name.text, kind: "function", line }];
-  if (ts.isClassDeclaration(node) && node.name) return [{ name: node.name.text, kind: "class", line }];
-  if (ts.isInterfaceDeclaration(node)) return [{ name: node.name.text, kind: "interface", line }];
-  if (ts.isTypeAliasDeclaration(node)) return [{ name: node.name.text, kind: "type", line }];
-  if (ts.isEnumDeclaration(node)) return [{ name: node.name.text, kind: "enum", line }];
-  if (ts.isVariableStatement(node)) {
-    return node.declarationList.declarations.flatMap((declaration) =>
-      ts.isIdentifier(declaration.name) ? [{ name: declaration.name.text, kind: "variable", line }] : []
-    );
-  }
-  return [];
-}
-
-async function loadSources(root: string, maxFileBytes: number): Promise<LoadedSource[]> {
-  const loaded: LoadedSource[] = [];
-  for (const path of await sourceFiles(root)) {
-    const absolute = resolve(root, path);
-    try {
-      const fileInfo = await lstat(absolute);
-      if (fileInfo.isSymbolicLink() || !fileInfo.isFile() || fileInfo.size > maxFileBytes) continue;
-      const content = await readFile(absolute, "utf8");
-      const source = ts.createSourceFile(path, content, ts.ScriptTarget.Latest, true, scriptKind(path));
-      const imports = source.statements.flatMap((statement) => {
-        if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) return [];
-        return [statement.moduleSpecifier.text];
-      });
-      const symbols = source.statements.flatMap((statement) => symbolFromNode(statement, source));
-      loaded.push({ summary: { path, imports, symbols }, content });
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
-      throw error;
-    }
-  }
-  return loaded;
+  index?: ContextIndexStats;
 }
 
 export async function buildRepositoryMap(root: string, maxFileBytes = 200_000): Promise<RepositoryMap> {
-  const loaded = await loadSources(root, maxFileBytes);
-  return { root: resolve(root), files: loaded.map((file) => file.summary) };
+  const indexed = await loadContextIndex(root, maxFileBytes);
+  return { root: resolve(root), files: indexed.entries.map((entry) => entry.summary), index: indexed.stats };
 }
 
-function queryTerms(query: string): string[] {
-  return query.toLowerCase().split(/[^\p{L}\p{N}_$-]+/u).filter((term) => term.length > 1);
-}
-
-function scoreFile(file: FileSummary, content: string, terms: string[], symbol?: string): number {
-  const lowerPath = file.path.toLowerCase();
-  const lowerContent = content.toLowerCase();
+function scoreFile(file: IndexedSource, terms: string[], symbol?: string): number {
+  const lowerPath = file.summary.path.toLowerCase();
+  const indexedTerms = new Set(file.searchTerms);
   let score = 0;
   for (const term of terms) {
     if (lowerPath.includes(term)) score += 20;
-    if (file.imports.some((item) => item.toLowerCase().includes(term))) score += 8;
-    if (file.symbols.some((item) => item.name.toLowerCase().includes(term))) score += 30;
-    if (lowerContent.includes(term)) score += 3;
+    if (file.summary.imports.some((item) => item.toLowerCase().includes(term))) score += 8;
+    if (file.summary.symbols.some((item) => item.name.toLowerCase().includes(term))) score += 30;
+    if (indexedTerms.has(term)) score += 3;
   }
   if (symbol) {
     const lowerSymbol = symbol.toLowerCase();
-    if (file.symbols.some((item) => item.name.toLowerCase() === lowerSymbol)) score += 100;
-    else if (lowerContent.includes(lowerSymbol)) score += 25;
+    if (file.summary.symbols.some((item) => item.name.toLowerCase() === lowerSymbol)) score += 100;
+    else if (indexedTerms.has(lowerSymbol)) score += 25;
   }
   return score;
 }
 
-function moduleAliases(path: string): string[] {
-  const extension = extname(path);
-  const withoutExtension = extension ? path.slice(0, -extension.length) : path;
-  return withoutExtension.endsWith("/index") ? [withoutExtension, withoutExtension.slice(0, -"/index".length)] : [withoutExtension];
-}
-
-function resolveRelativeImport(fromPath: string, specifier: string, aliases: Map<string, string>): string | undefined {
-  if (!specifier.startsWith(".")) return undefined;
-  const candidate = posix.normalize(posix.join(posix.dirname(posixPath(fromPath)), specifier));
-  const extension = extname(candidate);
-  const withoutExtension = extension ? candidate.slice(0, -extension.length) : candidate;
-  return aliases.get(withoutExtension) ?? aliases.get(`${withoutExtension}/index`);
-}
-
-function expandImportScores(loaded: LoadedSource[], scores: Map<string, number>): void {
+function expandImportScores(root: string, indexed: IndexedSource[], scores: Map<string, number>): void {
   const aliases = new Map<string, string>();
-  for (const file of loaded) for (const alias of moduleAliases(file.summary.path)) aliases.set(alias, file.summary.path);
+  for (const file of indexed) for (const alias of moduleAliases(file.summary.path)) aliases.set(alias, file.summary.path);
+  const compilerOptions = compilerOptionsForRoot(root);
   const initiallyRelevant = new Set([...scores.entries()].filter(([, score]) => score > 0).map(([path]) => path));
-  for (const file of loaded) {
+  for (const file of indexed) {
     for (const specifier of file.summary.imports) {
-      const imported = resolveRelativeImport(file.summary.path, specifier, aliases);
+      const imported = resolveIndexedImport(root, file.summary.path, specifier, aliases, compilerOptions);
       if (!imported) continue;
       if (initiallyRelevant.has(file.summary.path)) scores.set(imported, Math.max(scores.get(imported) ?? 0, 12));
       if (initiallyRelevant.has(imported)) scores.set(file.summary.path, Math.max(scores.get(file.summary.path) ?? 0, 8));
@@ -242,12 +120,13 @@ export async function selectContext(
   root: string,
   options: { query: string; symbol?: string; budgetTokens?: number; maxFileBytes?: number }
 ): Promise<ContextResult> {
+  const resolvedRoot = resolve(root);
   const budgetTokens = options.budgetTokens ?? 1_200;
-  const loaded = await loadSources(root, options.maxFileBytes ?? 200_000);
-  const terms = queryTerms(options.query);
-  const scores = new Map(loaded.map((file) => [file.summary.path, scoreFile(file.summary, file.content, terms, options.symbol)]));
-  expandImportScores(loaded, scores);
-  const ranked = loaded
+  const indexed = await loadContextIndex(resolvedRoot, options.maxFileBytes ?? 200_000);
+  const terms = tokenizeContextSearch(options.query);
+  const scores = new Map(indexed.entries.map((file) => [file.summary.path, scoreFile(file, terms, options.symbol)]));
+  expandImportScores(resolvedRoot, indexed.entries, scores);
+  const ranked = indexed.entries
     .map((file) => ({ ...file, score: scores.get(file.summary.path) ?? 0 }))
     .filter((file) => file.score > 0)
     .sort((left, right) => right.score - left.score || left.summary.path.localeCompare(right.summary.path));
@@ -255,7 +134,14 @@ export async function selectContext(
   const snippets: ContextSnippet[] = [];
   let usedTokens = 0;
   for (const candidate of ranked) {
-    const lines = candidate.content.split(/\r?\n/u);
+    let content: string;
+    try {
+      content = await readFile(resolve(resolvedRoot, candidate.summary.path), "utf8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+      throw error;
+    }
+    const lines = content.split(/\r?\n/u);
     const matches = matchingLines(lines, terms, options.symbol);
     if (matches.length === 0) matches.push(Math.max(0, (candidate.summary.symbols[0]?.line ?? 1) - 1));
     const covered: Array<{ start: number; end: number }> = [];
@@ -276,7 +162,7 @@ export async function selectContext(
     }
     if (usedTokens >= budgetTokens) break;
   }
-  return { snippets, text: snippets.map((snippet) => snippet.text).join("\n\n"), estimatedTokens: usedTokens };
+  return { snippets, text: snippets.map((snippet) => snippet.text).join("\n\n"), estimatedTokens: usedTokens, index: indexed.stats };
 }
 
 export function formatRepositoryMap(map: RepositoryMap, maxFiles = 500): string {

@@ -1,6 +1,6 @@
 # Privacy model
 
-TerseForge v0.1 is local by construction.
+TerseForge v0.2 is local by construction.
 
 ## Data written
 
@@ -10,6 +10,7 @@ All runtime data is kept under the target repository's `.terseforge/` directory:
 .terseforge/
 ├── artifacts/       stdout, stderr, merged output, and sequenced events
 ├── benchmarks/      local component benchmark reports
+├── cache/           structural TS/JS context index, without complete source files
 ├── integrations/    copied reference assets
 ├── handoff.md       compact Git-aware handoff
 └── runs.jsonl       command metadata and size estimates
@@ -25,4 +26,6 @@ TerseForge has no server, analytics SDK, telemetry endpoint, account system, pro
 
 Commands can print credentials or private source data. Output artifacts are therefore sensitive even though they stay local. TerseForge requests owner-only permissions when creating artifacts; filesystem and operating-system policy ultimately control access.
 
-Keep `.terseforge/` out of version control. Review any handoff before sharing it. Delete local state manually when retention is no longer needed; automatic retention cleanup is intentionally not implemented in v0.1.
+`terseforge init` adds `/.terseforge/` to the project `.gitignore`, and `doctor` warns when that explicit rule is absent. Review any handoff before sharing it.
+
+Retention cleanup is always explicit. Preview it with `terseforge clean --dry-run`, then run `terseforge clean` to remove expired artifacts and metric records according to the configured retention period. Cleanup does not run in the background, leave the known local state directories, or follow directory symlinks.

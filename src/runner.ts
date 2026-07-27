@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import spawn from "cross-spawn";
 import type { Preset } from "./config.js";
 import { StreamingPruner } from "./pruning.js";
+import { detectPruningAdapter } from "./pruning-adapters.js";
 import {
   appendMetric,
   createArtifactWriter,
@@ -119,7 +120,8 @@ export async function runProcess(options: RunProcessOptions): Promise<RunProcess
     await closeWriters(writers).catch(() => undefined);
     throw new Error("Failed to initialize output artifacts.");
   }
-  const pruner = new StreamingPruner(options.preset);
+  const pruningAdapter = await detectPruningAdapter(options.root, options.command, options.args);
+  const pruner = new StreamingPruner(options.preset, { adapter: pruningAdapter });
   let rawBytes = 0;
   let stdoutBytes = 0;
   let stderrBytes = 0;
@@ -261,6 +263,7 @@ export async function runProcess(options: RunProcessOptions): Promise<RunProcess
     estimatedInputTokens: Math.ceil(rawBytes / 4),
     estimatedVisibleTokens: Math.ceil(Buffer.byteLength(visibleOutput) / 4),
     timedOut: termination.timedOut,
+    pruningAdapter,
     stdoutBytes,
     stderrBytes,
     ...(termination.forced ? { forcedTermination: true } : {}),

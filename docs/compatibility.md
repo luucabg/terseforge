@@ -48,4 +48,4 @@ Existing target files are preserved and reported as skipped. All reference asset
 
 ## Verification status
 
-v0.1 validates the skill package, tests installation paths and collision behavior, and tests the CLI end to end. It does not run full UI sessions inside every third-party agent. The `doctor` command reports installed assets separately from the integration level so "file exists" is not presented as "agent traffic is intercepted."
+v0.2 validates the skill package, tests installation paths and collision behavior, and tests the CLI end to end. It does not run full UI sessions inside every third-party agent. The `doctor` command reports installed assets separately from the integration level so "file exists" is not presented as "agent traffic is intercepted."

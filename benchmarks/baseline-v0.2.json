@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "corpusVersion": 2,
+  "scope": "tool-output-pruning-only",
+  "fixture": "diagnostic-corpus-v2",
+  "fixtureCount": 5,
+  "conditions": [
+    {
+      "preset": "safe",
+      "rawBytes": 38407,
+      "visibleBytes": 17555,
+      "reductionPercent": 54.29,
+      "diagnosticsRetained": true,
+      "rawRecoverable": true
+    },
+    {
+      "preset": "lean",
+      "rawBytes": 38407,
+      "visibleBytes": 9035,
+      "reductionPercent": 76.48,
+      "diagnosticsRetained": true,
+      "rawRecoverable": true
+    },
+    {
+      "preset": "ultra",
+      "rawBytes": 38407,
+      "visibleBytes": 5338,
+      "reductionPercent": 86.1,
+      "diagnosticsRetained": true,
+      "rawRecoverable": true
+    }
+  ],
+  "note": "Five-fixture component baseline only. It does not measure end-to-end agent tokens, cost, task success, or code quality."
+}

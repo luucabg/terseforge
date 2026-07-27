@@ -19,7 +19,7 @@ The workflow requests GitHub OIDC permission and does not use an npm token. npm 
 1. Update `package.json`, `package-lock.json`, the CLI version, README badges, `llms.txt`, and `CHANGELOG.md`.
 2. Run `npm run check` and `npm pack --dry-run --json`.
 3. Merge the release pull request only after the Windows, macOS, and Linux matrix passes.
-4. Create and push the matching annotated tag, such as `v0.1.2`.
+4. Create and push the matching annotated tag, such as `v0.2.0`.
 5. Create the GitHub release from that tag.
 6. Dispatch the `Publish npm package` workflow with the exact tag.
 7. Verify the registry metadata and execute the CLI through `npx terseforge@<version> --version`.

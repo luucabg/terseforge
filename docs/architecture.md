@@ -1,6 +1,6 @@
 # Architecture
 
-TerseForge v0.1 is one ESM npm package with internal module boundaries. A monorepo would add versioning and release overhead without a demonstrated need.
+TerseForge v0.2 is one ESM npm package with internal module boundaries. A monorepo would add versioning and release overhead without a demonstrated need.
 
 ## Modules
 
@@ -8,13 +8,17 @@ TerseForge v0.1 is one ESM npm package with internal module boundaries. A monore
 | --- | --- |
 | `config` | Validate schema v1, presets, context limits, and argument-array gates. |
 | `project` | Initialize local state, copy integration assets without overwriting user files, and diagnose capabilities. |
+| `state-safety` | Keep runtime state out of Git with one idempotent project ignore rule. |
 | `skill` | Resolve, inspect, and install native Agent Skill discovery paths without overwriting foreign files. |
 | `runner` | Execute argument arrays, capture each output stream, enforce bounded process-tree termination, compact the visible view, and record metrics. |
 | `pruning` | Retain configurable head/tail context, diagnostics, and nearby multiline context; count exact duplicate diagnostics in lean/ultra. |
+| `pruning-adapters` | Detect TypeScript, ESLint, Vitest, and Jest invocations and apply conservative tool-aware diagnostic context. |
 | `storage` | Keep per-stream artifacts, merged output, event logs, backward-compatible JSONL metrics, benchmark reports, integration copies, and handoffs. |
-| `context` | Discover tracked and untracked sources, parse each file once, rank paths/imports/declarations/content, expand one import hop, and emit bounded snippets. |
+| `context-index` | Persist a bounded structural TS/JS index, reuse unchanged entries, and remove stale entries safely. |
+| `context` | Rank paths/imports/declarations/search terms, expand one import hop, and read only selected sources for bounded snippets. |
 | `gates` | Run explicit configured checks sequentially and distinguish passed, failed, timed-out, and unconfigured results. |
-| `benchmark` | Exercise pruning and byte-for-byte recovery on a deterministic fixture. |
+| `cleanup` | Preview or remove expired artifacts, benchmark reports, and metric records within controlled state directories. |
+| `benchmark` | Exercise adapters, pruning, diagnostic retention, and byte-for-byte recovery on a deterministic fixture corpus. |
 | `workflows` | Aggregate metrics and create Git-aware handoffs. |
 | `cli-program` | Wire the public commands to the modules above. |
 
@@ -51,16 +55,18 @@ Timeouts use two phases. TerseForge first requests process-tree termination, wai
 git tracked + untracked, non-ignored files (fallback: glob + .gitignore)
         -> supported TS/JS files
         -> size limit
-        -> imports and top-level symbols
-        -> lexical path/import/symbol/content score
+        -> persistent structural index
+        -> imports, exports, top-level symbols, and search terms
+        -> lexical path/import/symbol/search-term score
         -> one-hop import expansion
+        -> current source reads for ranked candidates
         -> one or more match-centered numbered snippets
         -> estimated token budget
 ```
 
-Token counts are estimates. v0.1 divides UTF-8 bytes by four and rounds up. A local CLI cannot access provider-reported token counts, so TerseForge keeps estimated and reported values separate.
+Token counts are estimates. v0.2 divides UTF-8 bytes by four and rounds up. A local CLI cannot access provider-reported token counts, so TerseForge keeps estimated and reported values separate.
 
-Context files are parsed once per command, rather than twice as in the initial implementation. v0.1 does not yet persist a repository index between commands. On a massive monorepo, use `--cwd` to scope TerseForge to the relevant workspace until incremental indexing is implemented and benchmarked.
+The index stores structural metadata and normalized search terms, not complete source files. It is written atomically under `.terseforge/cache/`. A conservative size and filesystem-time fingerprint reuses unchanged entries; new and changed files are reparsed, deleted files are removed, and a damaged cache is rebuilt. Relative imports, reexports, dynamic imports, CommonJS `require` calls, and root `tsconfig` path aliases participate in dependency expansion. Use `--cwd` to scope very large monorepos to the relevant workspace.
 
 ## Failure policy
 
@@ -70,6 +76,7 @@ Context files are parsed once per command, rather than twice as in the initial i
 - Optional integration files never overwrite existing user-owned files.
 - Unsupported or unavailable agent hooks are described as limitations, not silently emulated.
 - A missing Git executable falls back to file discovery; a missing or invalid configuration is an explicit error.
+- Cleanup is explicit, stays inside known state directories, and never follows directory symlinks.
 
 ## Public API
 
