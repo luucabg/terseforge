@@ -84,8 +84,10 @@ terseforge skill install --agent codex --force
 
 Installation is idempotent. `--force` updates only a skill whose frontmatter already identifies it as TerseForge. The installer preserves unknown files and partially occupied destinations.
 
-## Stop or remove it
+## Stop, clean, or remove it
 
-To stop using TerseForge for the current task, stop invoking its commands. Persistent removal is manual by design. Inspect the exact user or project path first, then remove only the TerseForge skill directory and configuration you intend to delete.
+To stop using TerseForge for the current task, stop invoking its commands. To preview expired runtime artifacts without touching configuration or skills, run `terseforge clean --dry-run`, then use `terseforge clean` only when you want that local state removed.
+
+Persistent configuration and skill removal is manual by design. Inspect the exact user or project path first, then remove only the TerseForge skill directory and configuration you intend to delete.
 
 The presets change context selection, log display, and visible communication. They do not shorten generated code or lower the expected reasoning quality. Required quality gates still block completion when verification fails.

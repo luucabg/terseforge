@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://github.com/luucabg/terseforge/actions/workflows/ci.yml"><img alt="CI status" src="https://github.com/luucabg/terseforge/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://www.npmjs.com/package/terseforge"><img alt="npm version" src="https://img.shields.io/npm/v/terseforge?color=CB3837&logo=npm"></a>
-  <a href="https://github.com/luucabg/terseforge/releases/tag/v0.1.2"><img alt="Release v0.1.2" src="https://img.shields.io/badge/release-v0.1.2-E86A17"></a>
+  <a href="https://github.com/luucabg/terseforge/releases/tag/v0.2.0"><img alt="Release v0.2.0" src="https://img.shields.io/badge/release-v0.2.0-E86A17"></a>
   <img alt="Node.js 22 or newer" src="https://img.shields.io/badge/Node.js-22%2B-5FA04E?logo=nodedotjs&logoColor=white">
   <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-2563EB"></a>
   <img alt="No remote telemetry" src="https://img.shields.io/badge/remote_telemetry-none-111827">
@@ -49,7 +49,7 @@ TerseForge makes reduction reversible:
 | --- | --- |
 | Large terminal logs consume context | Shows a compact diagnostic view and stores the complete output locally. |
 | An omitted line becomes important later | Recovers stored bytes, original line endings, or the exact stdout/stderr stream. |
-| The agent reads whole files too early | Ranks TS/JS paths, imports, symbols, related files, and multiple snippets within a budget. |
+| The agent reads whole files too early | Reuses an incremental TS/JS index, ranks related files, and emits multiple snippets within a budget. |
 | Token savings tempt agents to skip checks | Detects explicit project scripts and fails closed when required verification is absent. |
 | Integration claims are vague | Labels each agent as native-limited, instructions-only, or experimental. |
 | You do not want to upload code or logs | Keeps state local under `.terseforge/` and sends no remote telemetry. |
@@ -147,7 +147,7 @@ The CLI uses executable-and-argument arrays rather than a user-controlled shell 
 Context selection follows a separate progressive path:
 
 ```text
-tracked and untracked files → TS/JS candidates → imports and symbols → related files → ranked snippets → token estimate
+tracked and untracked files → incremental TS/JS index → dependency expansion → ranked snippets → token estimate
 ```
 
 See the [architecture](docs/architecture.md) for module and failure-policy details.
@@ -169,6 +169,7 @@ The installer preserves files it does not own. Read [Agent Skill setup](docs/ski
 | `terseforge check` | Configured gates; required failures return a non-zero exit code. |
 | `terseforge handoff "objective"` | A deterministic local session handoff. |
 | `terseforge stats [--json]` | Local execution and visible-byte metrics. |
+| `terseforge clean [--dry-run] [--older-than days]` | Preview or remove expired local artifacts and metric records. |
 | `terseforge bench [--json]` | The reproducible pruning-and-recovery benchmark. |
 
 Visible-byte statistics include the recovery instruction itself. Very short outputs can therefore report negative savings; TerseForge exposes that overhead instead of hiding it.
@@ -181,13 +182,13 @@ Visible-byte statistics include the recovery instruction itself. Very short outp
 | **`lean`** | 25 / 25 lines | Exact duplicates counted | Daily work after validating the repository. |
 | **`ultra`** | 10 / 10 lines | Exact duplicates counted | Explicitly chosen low-chatter workflows. |
 
-All presets retain diagnostic lines plus nearby multiline context such as stack frames and source excerpts. If nearly every line is diagnostic, the compact output may remain large. Correctness wins over compression.
+All presets retain diagnostic lines plus nearby multiline context such as stack frames, assertion diffs, and source excerpts. TerseForge detects direct and package-script invocations of TypeScript, ESLint, Vitest, and Jest, then falls back to a conservative generic classifier. If nearly every line is diagnostic, the compact output may remain large. Correctness wins over compression.
 
 ## Compatibility
 
 Compatibility is based on what the integration can do, not on how many product logos fit in the README.
 
-| Agent | v0.1 level | Available today | Not claimed |
+| Agent | v0.2 level | Available today | Not claimed |
 | --- | --- | --- | --- |
 | Claude Code | **Native-limited** | Native `terseforge` skill, `/terseforge`, `CLAUDE.md`, and explicit CLI workflow. | Automatic interception of every tool call. |
 | Codex | **Native-limited** | Native `terseforge` skill, `$terseforge`, `AGENTS.md`, and explicit CLI workflow. | Automatic replacement of tool results. |
@@ -199,13 +200,13 @@ Compatibility is based on what the integration can do, not on how many product l
 
 ## Measured component benchmark
 
-The included benchmark generates a fixed 504-line synthetic TypeScript test log, compresses it with every preset, checks that known diagnostics and nearby context remain visible, and verifies byte-for-byte stored-artifact recovery.
+The included benchmark runs a deterministic five-fixture corpus shaped like generic command output, TypeScript, ESLint, Vitest, and Jest. It compresses every fixture with every preset, checks that complete known diagnostics remain visible, and verifies byte-for-byte stored-artifact recovery.
 
 | Preset | Visible-byte reduction | Diagnostics retained | Raw output recoverable |
 | --- | ---: | :---: | :---: |
-| `safe` | 73.55% | Yes | Yes |
-| `lean` | 86.76% | Yes | Yes |
-| `ultra` | 92.41% | Yes | Yes |
+| `safe` | 54.29% | Yes | Yes |
+| `lean` | 76.48% | Yes | Yes |
+| `ultra` | 86.10% | Yes | Yes |
 
 Run it yourself:
 
@@ -217,7 +218,7 @@ node dist/cli.js bench --json
 > [!CAUTION]
 > These numbers measure one deterministic tool-output component. They are **not** claims about total tokens, model cost, task success, or code quality. End-to-end claims require controlled A/B agent runs.
 
-The committed result is in [`benchmarks/baseline-v0.1.json`](benchmarks/baseline-v0.1.json). The full protocol and release criteria are in [benchmarking](docs/benchmarking.md).
+The current committed result is in [`benchmarks/baseline-v0.2.json`](benchmarks/baseline-v0.2.json). The original v0.1 baseline remains available for historical comparison. The full protocol and release criteria are in [benchmarking](docs/benchmarking.md).
 
 ## Configuration
 
@@ -247,18 +248,26 @@ The committed result is in [`benchmarks/baseline-v0.1.json`](benchmarks/baseline
 }
 ```
 
-Commands and arguments stay separate. Shell expressions such as `npm test && deploy` are rejected. v0.1 records artifact-retention intent but does not delete artifacts automatically. See the [configuration reference](docs/configuration.md).
+Commands and arguments stay separate. Shell expressions such as `npm test && deploy` are rejected. See the [configuration reference](docs/configuration.md).
 
-`terseforge init` detects existing `typecheck`, `lint`, `test`, and `build` package scripts and writes only those gates, without `--if-present`. If no gates are configured, `terseforge check` exits non-zero and records verification as not configured.
+`terseforge init` detects existing `typecheck`, `lint`, `test`, and `build` package scripts and writes only those gates, without `--if-present`. It also adds one idempotent `/.terseforge/` rule to `.gitignore` so raw command output is not committed accidentally. If no gates are configured, `terseforge check` exits non-zero and records verification as not configured.
+
+`artifactRetentionDays` is applied explicitly through `terseforge clean`. Use `--dry-run` before removal when reviewing shared or unfamiliar workspaces.
+
+## Large repositories
+
+`map` and `context` keep a local structural index at `.terseforge/cache/context-index-v1.json`. Unchanged files reuse cached imports, symbols, and search terms; new or changed files are parsed again, and deleted files are removed from the index. Reexports, dynamic imports, CommonJS `require` calls, relative imports, and root `tsconfig` path aliases participate in one-hop dependency expansion.
+
+The index does not contain complete source files. Context snippets are read from the current working tree only after candidates are ranked. For very large monorepos, `--cwd <workspace>` remains useful for limiting the search boundary.
 
 ## Local by design
 
-| Property | v0.1 behavior |
+| Property | v0.2 behavior |
 | --- | --- |
 | Server | None required or included. |
 | Model calls | None. TerseForge is not an LLM proxy. |
 | Remote telemetry | None. The configuration only accepts `false`. |
-| Stored data | Per-stream artifacts, merged output, event logs, metrics, reports, and handoffs under `.terseforge/`. |
+| Stored data | Per-stream artifacts, merged output, event logs, metrics, index data, reports, and handoffs under `.terseforge/`. |
 | Process execution | Argument arrays; no concatenated user-controlled shell expression. |
 | Failure policy | Compression remains recoverable; required quality gates fail closed. |
 
@@ -266,11 +275,9 @@ Command output can contain secrets. Raw artifacts use owner-only permissions whe
 
 ## Project status
 
-TerseForge `v0.1.2` is an experimental, working MVP published on npm for Node.js 22 and 24 on Windows, macOS, and Linux. CI runs type checking, ESLint, tests with coverage thresholds, a production build, CLI smoke tests, and the component benchmark.
+TerseForge `v0.2.0` is an experimental, working release published on npm for Node.js 22 and 24 on Windows, macOS, and Linux. CI runs type checking, ESLint, tests with coverage thresholds, a production build, CLI smoke tests, and the component benchmark.
 
-Context discovery parses each eligible file once per command, but it does not yet maintain a persistent incremental index. For very large monorepos, scope commands with `--cwd <workspace>`; enterprise-scale indexing remains future work rather than a current claim.
-
-Deliberate v0.1 exclusions:
+Deliberate v0.2 exclusions:
 
 - no adaptive `auto` preset;
 - no embeddings, vector database, or semantic model;

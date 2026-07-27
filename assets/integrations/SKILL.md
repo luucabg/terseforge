@@ -25,6 +25,7 @@ Never use `init --force` merely to change modes. Never overwrite an existing for
 - Retrieve omitted content with `terseforge output <run-id>` whenever more evidence is needed.
 - Preserve code, diffs, commands, paths, diagnostics, and security findings exactly.
 - Run `terseforge check` before claiming completion. Required failures block verification.
+- Use `terseforge clean --dry-run` to preview expired local state before explicit cleanup.
 
 `safe`, `lean`, and `ultra` control visible context and logs, not code length or reasoning quality. Prefer `safe` for risky or unfamiliar work.
 
@@ -32,4 +33,4 @@ Never use `init --force` merely to change modes. Never overwrite an existing for
 
 - For status, run `terseforge doctor` and `terseforge skill status --agent <host> --scope project`.
 - To stop using TerseForge for the current task, stop invoking its commands and say that project files remain unchanged.
-- Before removing persistent configuration or skill files, list the exact paths and obtain confirmation; removal is not automated.
+- Before removing persistent configuration or skill files, list the exact paths and obtain confirmation. `terseforge clean` removes only expired runtime state, not configuration or skill files.

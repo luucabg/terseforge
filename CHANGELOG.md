@@ -6,6 +6,30 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-27
+
+### Added
+
+- Persistent incremental TypeScript and JavaScript context index with safe cache recovery and selective reparsing.
+- Dependency discovery for reexports, dynamic imports, CommonJS `require` calls, and root `tsconfig` path aliases.
+- Conservative pruning adapters for TypeScript, ESLint, Vitest, and Jest, including multiline assertion and diagnostic context.
+- Explicit `clean` command with dry-run support and bounded retention cleanup for local artifacts, benchmark reports, and metrics.
+- Automatic, idempotent `/.terseforge/` protection in `.gitignore` plus a `doctor` warning when local state is not ignored.
+- Five-fixture component benchmark corpus covering generic, TypeScript, ESLint, Vitest, and Jest output.
+
+### Changed
+
+- Made context selection reuse unchanged structural metadata, remove deleted files, include new untracked files, and read source only for ranked snippet candidates.
+- Recorded the detected pruning adapter in local run metrics while preserving older metric records.
+- Labeled optional `doctor` findings as warnings rather than failures.
+- Updated the benchmark evidence and documentation without treating component byte reduction as total-token savings.
+- Bumped the package and CLI to Node.js release `0.2.0` while preserving the schema-v1 configuration format and public command behavior.
+
+### Security
+
+- Rejected linked `.terseforge` state roots and linked state directories, restricted cleanup to owned paths, and preserved malformed historical metric lines instead of deleting uncertain data.
+- Kept context caches local, atomically written, owner-restricted where supported, and free of complete source-file contents.
+
 ## [0.1.2] - 2026-07-23
 
 ### Added
@@ -63,7 +87,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Claude Code, Codex, Gemini CLI, AGENTS.md, Cursor, Windsurf, and Cline assets with explicit compatibility limits.
 - Deterministic component benchmark, cross-platform CI, tests, coverage enforcement, and project documentation.
 
-[Unreleased]: https://github.com/luucabg/terseforge/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/luucabg/terseforge/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/luucabg/terseforge/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/luucabg/terseforge/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/luucabg/terseforge/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/luucabg/terseforge/releases/tag/v0.1.0

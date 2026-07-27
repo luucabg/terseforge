@@ -2,7 +2,7 @@
 
 TerseForge separates a deterministic component benchmark from a future end-to-end agent benchmark.
 
-## Included v0.1 benchmark
+## Included v0.2 benchmark
 
 Run:
 
@@ -12,17 +12,19 @@ npm run build
 node dist/cli.js bench --json
 ```
 
-The command generates `synthetic-typescript-test-log-v1`: 504 lines containing routine transform, test, and cleanup output plus a known warning, TypeScript error, and failing-test summary. For `safe`, `lean`, and `ultra`, it records:
+The command generates a deterministic five-fixture corpus shaped like generic command output, TypeScript, ESLint, Vitest, and Jest. Every fixture mixes routine output with complete known diagnostics. For `safe`, `lean`, and `ultra`, it records:
 
 - raw bytes;
 - visible bytes;
 - visible-byte reduction;
-- whether all known diagnostics remain visible;
-- whether the stored artifact is byte-for-byte identical to the fixture.
+- whether all known diagnostic fragments remain visible;
+- whether every stored artifact is byte-for-byte identical to its fixture.
 
 Reports are written to `.terseforge/benchmarks/`. Raw fixture copies are written to `.terseforge/artifacts/` so recovery is exercised, not assumed.
 
-This benchmark is deterministic except for timestamps and artifact IDs. It does not call an LLM and does not claim end-to-end token or cost savings.
+The committed v0.2 aggregate baseline contains 38,407 raw bytes. It reports 54.29% visible-byte reduction for `safe`, 76.48% for `lean`, and 86.10% for `ultra`, with diagnostics retained and exact artifact recovery in every condition.
+
+This benchmark is deterministic except for timestamps and artifact IDs. It does not call an LLM and does not claim end-to-end token, cost, or code-quality savings. The older v0.1 single-fixture baseline remains in the repository for historical comparison.
 
 ## Release acceptance
 

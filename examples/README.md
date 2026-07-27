@@ -22,6 +22,7 @@ terseforge exec -- npm test
 terseforge check
 terseforge stats
 terseforge handoff "Complete refresh-token validation"
+terseforge clean --dry-run
 ```
 
 If the compact output omits context required to diagnose a failure, retrieve it exactly:

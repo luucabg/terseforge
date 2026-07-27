@@ -1,6 +1,8 @@
 import type { Preset } from "./config.js";
+import { classifyDiagnostic, type PruningAdapter } from "./pruning-adapters.js";
 
 export interface PruneResult {
+  adapter: PruningAdapter;
   text: string;
   rawLines: number;
   visibleLines: number;
@@ -19,11 +21,15 @@ const POLICIES: Record<Preset, { head: number; tail: number; deduplicateDiagnost
   ultra: { head: 10, tail: 10, deduplicateDiagnostics: true }
 };
 
-const DIAGNOSTIC_PATTERN = /(?:\berror\b|\bwarn(?:ing)?\b|\bfail(?:ed|ure)?\b|\bfatal\b|\bexception\b|\bpanic\b|\bERR_[A-Z_]+\b|\bTS\d{4}\b|\bnot ok\b|\bassert(?:ion)?\b)/iu;
-const DIAGNOSTIC_CONTEXT_LINES = 3;
+const MAX_DIAGNOSTIC_CONTEXT_BEFORE = 4;
+
+export interface PruneOptions {
+  adapter?: PruningAdapter;
+}
 
 export class StreamingPruner {
   readonly #policy: (typeof POLICIES)[Preset];
+  readonly #adapter: PruningAdapter;
   readonly #head: IndexedLine[] = [];
   readonly #tail: IndexedLine[] = [];
   readonly #diagnostics: IndexedLine[] = [];
@@ -33,8 +39,9 @@ export class StreamingPruner {
   #lineCount = 0;
   #diagnosticLinesRemaining = 0;
 
-  constructor(preset: Preset) {
+  constructor(preset: Preset, options: PruneOptions = {}) {
     this.#policy = POLICIES[preset];
+    this.#adapter = options.adapter ?? "generic";
   }
 
   push(chunk: string): void {
@@ -73,6 +80,7 @@ export class StreamingPruner {
 
     const text = visible.join("\n");
     return {
+      adapter: this.#adapter,
       text,
       rawLines: this.#lineCount,
       visibleLines: visible.length,
@@ -88,19 +96,21 @@ export class StreamingPruner {
     this.#tail.push(entry);
     if (this.#tail.length > this.#policy.tail) this.#tail.shift();
 
-    if (DIAGNOSTIC_PATTERN.test(text)) {
+    const classification = classifyDiagnostic(text, this.#adapter);
+    if (classification.diagnostic) {
+      const recent = this.#recent.slice(-classification.contextBefore);
       if (!this.#policy.deduplicateDiagnostics) {
-        this.#diagnostics.push(...this.#recent, entry);
-        this.#diagnosticLinesRemaining = DIAGNOSTIC_CONTEXT_LINES;
+        this.#diagnostics.push(...recent, entry);
+        this.#diagnosticLinesRemaining = Math.max(this.#diagnosticLinesRemaining, classification.contextAfter);
       } else {
-        const existing = this.#diagnosticCounts.get(text);
+        const existing = this.#diagnosticCounts.get(classification.key);
         if (existing) {
           existing.count += 1;
-          this.#diagnosticLinesRemaining = 0;
+          this.#diagnosticLinesRemaining = Math.max(this.#diagnosticLinesRemaining, classification.contextAfter);
         } else {
-          this.#diagnostics.push(...this.#recent);
-          this.#diagnosticCounts.set(text, { first: entry, count: 1 });
-          this.#diagnosticLinesRemaining = DIAGNOSTIC_CONTEXT_LINES;
+          this.#diagnostics.push(...recent);
+          this.#diagnosticCounts.set(classification.key, { first: entry, count: 1 });
+          this.#diagnosticLinesRemaining = Math.max(this.#diagnosticLinesRemaining, classification.contextAfter);
         }
       }
     } else if (this.#diagnosticLinesRemaining > 0) {
@@ -109,12 +119,12 @@ export class StreamingPruner {
     }
 
     this.#recent.push(entry);
-    if (this.#recent.length > DIAGNOSTIC_CONTEXT_LINES) this.#recent.shift();
+    if (this.#recent.length > MAX_DIAGNOSTIC_CONTEXT_BEFORE) this.#recent.shift();
   }
 }
 
-export function pruneText(text: string, preset: Preset): PruneResult {
-  const pruner = new StreamingPruner(preset);
+export function pruneText(text: string, preset: Preset, options: PruneOptions = {}): PruneResult {
+  const pruner = new StreamingPruner(preset, options);
   pruner.push(text);
   return pruner.finish();
 }

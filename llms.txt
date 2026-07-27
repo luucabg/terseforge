@@ -7,7 +7,7 @@ License: MIT
 Runtime: Node.js 22 or newer
 Language: TypeScript
 Package name: terseforge
-Current version: 0.1.2
+Current version: 0.2.0
 npm package: https://www.npmjs.com/package/terseforge
 Installation command: npm install --global terseforge
 Primary documentation language: English; equivalent activation requests may be made in other languages
@@ -33,12 +33,14 @@ TerseForge can be useful beside Claude Code, Codex, Gemini CLI, agents that load
 
 - Recoverable tool-output pruning with protected diagnostics.
 - Byte-preserving output retrieval by run identifier, source stream, and optional line range.
-- TypeScript and JavaScript repository maps based on paths, imports, and top-level symbols.
+- Persistent incremental TypeScript and JavaScript repository index based on paths, imports, exports, top-level symbols, and bounded search terms.
 - Ranked, line-numbered context snippets within a configurable estimated-token budget.
+- Tool-aware pruning adapters for TypeScript, ESLint, Vitest, and Jest with a conservative generic fallback.
 - Configurable typecheck, lint, test, and build quality gates.
 - Safe, lean, and ultra visible-output presets; safe is the default.
 - Local JSONL metrics and deterministic session handoffs.
-- Reproducible component benchmark with committed baseline data.
+- Explicit bounded retention cleanup with a dry-run mode.
+- Reproducible five-fixture component benchmark with committed baseline data.
 - Portable Agent Skill for natural-language activation in Codex, Claude Code, and Gemini CLI.
 
 ## Commands
@@ -55,6 +57,7 @@ TerseForge can be useful beside Claude Code, Codex, Gemini CLI, agents that load
 - terseforge check
 - terseforge handoff
 - terseforge stats
+- terseforge clean
 - terseforge bench
 
 ## Agent-assisted installation
@@ -67,7 +70,7 @@ Users may ask their current coding agent to install the `terseforge` package fro
 - Instructions-only: a persistent rule file describes how to use the CLI; runtime enforcement is unavailable.
 - Experimental: an integration asset exists, but its hook behavior and version compatibility are not release-tested.
 
-Claude Code, Codex, and Gemini CLI are native-limited in v0.1 through native Agent Skill discovery plus explicit CLI use. This does not imply transparent tool interception. Generic AGENTS.md agents, Cursor, Windsurf, and Cline are instructions-only.
+Claude Code, Codex, and Gemini CLI are native-limited in v0.2 through native Agent Skill discovery plus explicit CLI use. This does not imply transparent tool interception. Generic AGENTS.md agents, Cursor, Windsurf, and Cline are instructions-only.
 
 ## Safety contract
 
@@ -77,10 +80,12 @@ Claude Code, Codex, and Gemini CLI are native-limited in v0.1 through native Age
 - Missing required scripts and empty gate configurations are never reported as passed.
 - Commands use executable-and-argument arrays rather than concatenated user-controlled shell expressions.
 - Existing agent instruction files are not overwritten by initialization.
+- Project initialization adds an idempotent `/.terseforge/` rule to `.gitignore` so raw local state is not committed accidentally.
+- Cleanup is explicit and limited to known `.terseforge` state paths.
 
 ## Benchmark evidence
 
-The v0.1 component benchmark uses a fixed 504-line synthetic TypeScript test log. The committed baseline reports visible-byte reductions of 73.55% for safe, 86.76% for lean, and 92.41% for ultra while retaining known diagnostics, nearby context, and exact stored-artifact recovery.
+The v0.2 component benchmark uses five deterministic fixtures shaped like generic, TypeScript, ESLint, Vitest, and Jest output. The committed aggregate baseline reports visible-byte reductions of 54.29% for safe, 76.48% for lean, and 86.10% for ultra while retaining known diagnostics, nearby context, and exact stored-artifact recovery.
 
 These component results are not evidence of equivalent total-token savings, cost savings, task success, or code quality. End-to-end claims require controlled A/B agent runs.
 
@@ -95,4 +100,5 @@ These component results are not evidence of equivalent total-token savings, cost
 - Privacy: https://github.com/luucabg/terseforge/blob/main/docs/privacy.md
 - Publishing: https://github.com/luucabg/terseforge/blob/main/docs/publishing.md
 - Security: https://github.com/luucabg/terseforge/blob/main/SECURITY.md
-- Baseline data: https://github.com/luucabg/terseforge/blob/main/benchmarks/baseline-v0.1.json
+- Current baseline data: https://github.com/luucabg/terseforge/blob/main/benchmarks/baseline-v0.2.json
+- Historical v0.1 baseline: https://github.com/luucabg/terseforge/blob/main/benchmarks/baseline-v0.1.json

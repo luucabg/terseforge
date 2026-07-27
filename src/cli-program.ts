@@ -2,6 +2,7 @@ import { createReadStream } from "node:fs";
 import { resolve } from "node:path";
 import { Argument, Command, Option } from "commander";
 import { runBenchmark } from "./benchmark.js";
+import { cleanLocalState } from "./cleanup.js";
 import { loadConfig, PRESETS, setPreset, type Preset } from "./config.js";
 import { buildRepositoryMap, formatRepositoryMap, selectContext } from "./context.js";
 import { runQualityGates } from "./gates.js";
@@ -54,7 +55,7 @@ export function createCli(io: CliIo = defaultIo): Command {
   program
     .name("terseforge")
     .description("Big code. Small chatter. Local optimization for AI coding-agent workflows.")
-    .version("0.1.2")
+    .version("0.2.0")
     .option("--cwd <path>", "repository root", process.cwd())
     .configureOutput({ writeOut: io.stdout, writeErr: io.stderr });
   program.enablePositionalOptions();
@@ -70,6 +71,7 @@ export function createCli(io: CliIo = defaultIo): Command {
     .action(async (options: { preset: "safe" | "lean" | "ultra"; install: string[]; force: boolean }) => {
       const result = await initializeProject(root(), options);
       io.stdout(line(`Created: ${result.created.join(", ") || "nothing"}`));
+      if (result.updated.length > 0) io.stdout(line(`Updated: ${result.updated.join(", ")}`));
       if (result.skipped.length > 0) io.stdout(line(`Preserved existing: ${result.skipped.join(", ")}`));
     });
 
@@ -119,7 +121,10 @@ export function createCli(io: CliIo = defaultIo): Command {
     .description("check runtime, configuration, and integration levels")
     .action(async () => {
       const report = await diagnoseProject(root());
-      for (const check of report.checks) io.stdout(line(`${check.ok ? "PASS" : "FAIL"} ${check.name}: ${check.detail}`));
+      for (const check of report.checks) {
+        const status = check.ok ? "PASS" : check.required ? "FAIL" : "WARN";
+        io.stdout(line(`${status} ${check.name}: ${check.detail}`));
+      }
       for (const integration of report.integrations) {
         io.stdout(line(`${integration.installed ? "ON" : "OFF"} ${integration.name} [${integration.level}]: ${integration.detail}`));
       }
@@ -240,6 +245,28 @@ export function createCli(io: CliIo = defaultIo): Command {
     });
 
   program
+    .command("clean")
+    .description("remove expired local artifacts and metrics within .terseforge")
+    .option("--older-than <days>", "retention window in days; defaults to configuration", (value) => Number(value))
+    .option("--dry-run", "show what would be removed without changing local state", false)
+    .action(async (options: { olderThan?: number; dryRun: boolean }) => {
+      const config = await loadConfig(root());
+      const result = await cleanLocalState(root(), {
+        olderThanDays: options.olderThan ?? config.output.artifactRetentionDays,
+        dryRun: options.dryRun
+      });
+      const prefix = result.dryRun ? "Dry run" : "Removed";
+      io.stdout(
+        line(
+          `${prefix}: ${result.files} files, ${result.metricRecords} metric records, ${result.bytes} bytes before ${result.cutoff}.`
+        )
+      );
+      const visiblePaths = result.paths.slice(0, 20);
+      for (const path of visiblePaths) io.stdout(line(`${result.dryRun ? "Would remove" : "Removed"}: ${path}`));
+      if (result.paths.length > visiblePaths.length) io.stdout(line(`... ${result.paths.length - visiblePaths.length} more paths omitted.`));
+    });
+
+  program
     .command("bench")
     .description("run the deterministic tool-output-pruning benchmark")
     .option("--json", "emit JSON", false)
@@ -249,6 +276,7 @@ export function createCli(io: CliIo = defaultIo): Command {
         ? JSON.stringify(result, null, 2)
         : [
             `Scope: ${result.scope}`,
+            `Fixtures: ${result.fixtureCount} (${result.fixture})`,
             ...result.conditions.map(
               (condition) =>
                 `${condition.preset}: ${condition.reductionPercent}% visible-byte reduction; diagnostics ${condition.diagnosticsRetained ? "retained" : "LOST"}; raw ${condition.rawRecoverable ? "recoverable" : "missing"}`
